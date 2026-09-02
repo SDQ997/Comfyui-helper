@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1b1e"/>
+      <stop offset="1" stop-color="#050608"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7ff0e4"/>
+      <stop offset="1" stop-color="#2ba99f"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="18" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- background: rounded square -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <!-- subtle grid -->
+  <g stroke="#4fd1c5" stroke-opacity="0.07" stroke-width="2">
+    <path d="M256 0v1024M512 0v1024M768 0v1024M0 256h1024M0 512h1024M0 768h1024"/>
+  </g>
+  <!-- rim light -->
+  <rect x="6" y="6" width="1012" height="1012" rx="214" fill="none" stroke="#4fd1c5" stroke-opacity="0.35" stroke-width="10"/>
+
+  <!-- C as circuit arc with node dots -->
+  <g filter="url(#glow)">
+    <path d="M 640 300 A 250 250 0 1 0 640 724"
+          fill="none" stroke="url(#cyan)" stroke-width="86" stroke-linecap="round"/>
+  </g>
+  <circle cx="640" cy="300" r="52" fill="#7ff0e4"/>
+  <circle cx="640" cy="724" r="52" fill="#7ff0e4"/>
+
+  <!-- H bars -->
+  <g filter="url(#glow)">
+    <rect x="478" y="330" width="76" height="364" rx="38" fill="#e8ecf2"/>
+    <rect x="620" y="330" width="76" height="364" rx="38" fill="#e8ecf2"/>
+    <rect x="478" y="474" width="218" height="76" rx="38" fill="#e8ecf2"/>
+  </g>
+</svg>

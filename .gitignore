@@ -1,0 +1,31 @@
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Build artifacts
+*.exe
+*.msi
+*.zip
+release/
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local data (portable mode)
+data/
+
+# Misc
+*.py
+*.log
+.tmp-cl/
+design/window_test.png
