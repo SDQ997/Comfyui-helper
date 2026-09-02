@@ -185,7 +185,8 @@ body {
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 /* 顶栏（decorations=false 时兼作自定义标题栏，整行可拖拽） */
 .topbar.titlebar {
-  height: 40px; padding: 0; gap: 0; flex: none;
+  display: flex; align-items: center; gap: 0;
+  height: 40px; padding: 0; flex: none;
   -webkit-user-select: none; user-select: none;
 }
 .tb-brand {
