@@ -138,6 +138,8 @@ pub fn run() {
             media::hidden_remove_many,
             media::video_thumbnail,
             media::delete_asset,
+            media::delete_lora,
+            media::delete_plugin,
             // prompt assistant
             prompt::list_models,
             prompt::chat_completion,

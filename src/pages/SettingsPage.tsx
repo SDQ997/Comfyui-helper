@@ -25,6 +25,15 @@ export default function SettingsPage() {
   const [dlStage, setDlStage] = useState("");
   const [mirror, setMirror] = useState("");
   const [saving, setSaving] = useState(false);
+  // Skill 折叠：展开的 skill id 集合（默认全部收拢）
+  const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set());
+  const toggleSkillExpand = (id: string) =>
+    setExpandedSkills((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   // ---- 草稿模型：所有编辑先写 draft，点「保存设置」才写回并持久化 ----
   const [draft, setDraft] = useState<AppConfig | null>(null);
@@ -40,6 +49,13 @@ export default function SettingsPage() {
     if (!config || !draft) return false;
     return JSON.stringify(config) !== JSON.stringify(draft);
   }, [config, draft]);
+
+  // 主题预览：draft 一变就同步 <html data-theme>（真正持久化靠保存）
+  useEffect(() => {
+    if (!draft?.general?.theme) return;
+    const t = draft.general.theme === "light" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", t);
+  }, [draft?.general?.theme]);
 
   const d = draft; // 简写
 
@@ -102,12 +118,22 @@ export default function SettingsPage() {
   const removeTemplate = (id: string) =>
     patchDraft({ templates: cfg.templates.filter((t) => t.id !== id) });
 
-  const addSkill = (name: string, content: string) =>
-    patchDraft({ skills: [...cfg.skills, { id: uid(), name, content, enabled: true }] });
+  const addSkill = (name: string, content: string) => {
+    const id = uid();
+    patchDraft({ skills: [...cfg.skills, { id, name, content, enabled: true }] });
+    // 新建后自动展开便于编辑
+    setExpandedSkills((prev) => new Set(prev).add(id));
+  };
   const patchSkill = (id: string, p: Partial<{ name: string; content: string; enabled: boolean }>) =>
     patchDraft({ skills: cfg.skills.map((s) => (s.id === id ? { ...s, ...p } : s)) });
-  const removeSkill = (id: string) =>
+  const removeSkill = (id: string) => {
     patchDraft({ skills: cfg.skills.filter((s) => s.id !== id) });
+    setExpandedSkills((prev) => {
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
+    });
+  };
 
   const importSkillFile = async () => {
     try {
@@ -359,22 +385,69 @@ export default function SettingsPage() {
                 <div className="desc" style={{ marginBottom: 12 }}>
                   导入/维护提示词技能片段，在「提示词助手」里按需勾选，会拼接到 System Prompt 中。
                 </div>
-                {cfg.skills.map((s) => (
-                  <div key={s.id} className="prompt-editor" style={{ opacity: s.enabled ? 1 : 0.55 }}>
-                    <div className="set-row">
-                      <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
-                        <div className={`toggle ${s.enabled ? "on" : ""}`} onClick={() => patchSkill(s.id, { enabled: !s.enabled })} />
-                        <span className="hint">启用</span>
-                      </label>
-                      <div className="input" style={{ flex: 1 }}>
-                        <input value={s.name} placeholder="Skill 名称" onChange={(e) => patchSkill(s.id, { name: e.target.value })} />
+                {cfg.skills.map((s) => {
+                  const open = expandedSkills.has(s.id);
+                  return (
+                    <div
+                      key={s.id}
+                      className={`prompt-editor ${open ? "open" : ""}`}
+                      style={{ opacity: s.enabled ? 1 : 0.55 }}
+                    >
+                      <div className="set-row" onClick={() => toggleSkillExpand(s.id)} style={{ cursor: "pointer" }}>
+                        <span className="skill-arrow" title={open ? "收起" : "展开内容"}>
+                          {open ? "▾" : "▸"}
+                        </span>
+                        <div className="input" style={{ flex: 1 }}>
+                          <span className="ico">✦</span>
+                          <input
+                            value={s.name}
+                            placeholder="Skill 名称"
+                            onClick={(ev) => ev.stopPropagation()}
+                            onChange={(e) => patchSkill(s.id, { name: e.target.value })}
+                          />
+                        </div>
+                        <span className="hint" style={{ whiteSpace: "nowrap" }}>
+                          {s.content.length} 字
+                        </span>
+                        <label
+                          style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}
+                          onClick={(ev) => ev.stopPropagation()}
+                        >
+                          <div
+                            className={`toggle ${s.enabled ? "on" : ""}`}
+                            onClick={() => patchSkill(s.id, { enabled: !s.enabled })}
+                          />
+                          <span className="hint">启用</span>
+                        </label>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            removeSkill(s.id);
+                          }}
+                          title="删除该 Skill"
+                        >
+                          删除
+                        </button>
                       </div>
-                      <button className="btn btn-danger btn-sm" onClick={() => removeSkill(s.id)} title="删除该 Skill">删除</button>
+                      {open && (
+                        <>
+                          <textarea
+                            className="txa mono"
+                            rows={5}
+                            placeholder="Skill 内容（规则 / 说明 / 示例）…"
+                            value={s.content}
+                            onChange={(e) => patchSkill(s.id, { content: e.target.value })}
+                            style={{ marginTop: 8 }}
+                          />
+                          <div className="hint" style={{ marginTop: 6 }}>
+                            将作为 <span className="mono">【Skill: {s.name}】</span> 拼接到 System Prompt（提示词助手勾选时生效）。
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <textarea className="txa mono" rows={4} placeholder="Skill 内容（规则 / 说明 / 示例）…" value={s.content}
-                      onChange={(e) => patchSkill(s.id, { content: e.target.value })} style={{ marginTop: 8 }} />
-                  </div>
-                ))}
+                  );
+                })}
                 {cfg.skills.length === 0 && (
                   <div className="hint">暂无 Skill。可点击「导入 .md Skill」从本地文件导入，或点「新建」手动创建。</div>
                 )}
@@ -388,6 +461,28 @@ export default function SettingsPage() {
                 <span className="num">05</span>通用 / 行为
               </h3>
               <div className="set-field">
+                <div className="lbl">主题外观</div>
+                <div className="v">
+                  <div className="set-row">
+                    <div className={`seg`}>
+                      <div
+                        className={`b ${cfg.general.theme !== "light" ? "active" : ""}`}
+                        onClick={() => patchDraft({ general: { ...cfg.general, theme: "dark" } })}
+                      >
+                        🌙 深色
+                      </div>
+                      <div
+                        className={`b ${cfg.general.theme === "light" ? "active" : ""}`}
+                        onClick={() => patchDraft({ general: { ...cfg.general, theme: "light" } })}
+                      >
+                        ☀ 浅色
+                      </div>
+                    </div>
+                  </div>
+                  <div className="hint">切换后立即预览，点「保存设置」持久化生效。</div>
+                </div>
+              </div>
+              <div className="set-field">
                 <div className="lbl">关闭行为</div>
                 <div className="v">
                   <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
@@ -397,15 +492,6 @@ export default function SettingsPage() {
                     />
                     <span>关闭窗口时最小化到托盘（默认直接退出，内存零常驻）</span>
                   </label>
-                </div>
-              </div>
-              <div className="set-field">
-                <div className="lbl">资产显示</div>
-                <div className="v">
-                  <div className="hint">
-                    在「资产管理」页可逐项隐藏 / 一键全部隐藏 / 全部恢复。「隐藏」是对资产内容做<b>模糊展示</b>
-                    （资产仍保留在列表中），列表持久化保存在应用数据目录 data/hidden.json。
-                  </div>
                 </div>
               </div>
             </div>

@@ -59,9 +59,15 @@ export default function LogsPage() {
     if (el && autoScroll) el.scrollTop = el.scrollHeight;
   }, [filtered.length, autoScroll]);
 
-  const clearView = () => {
+  const clearView = async () => {
+    // 清除视图：先把游标跳到当前最新 id，之后轮询只收新日志（避免又把历史拉回来）
+    try {
+      const got = await api.logFetch(0);
+      if (got.length) setLastId(got[got.length - 1].id);
+    } catch {
+      /* ignore */
+    }
     setItems([]);
-    setLastId(0);
   };
 
   const copyAll = async () => {
@@ -84,7 +90,7 @@ export default function LogsPage() {
         <div>
           <h1>日志</h1>
           <div className="desc">
-            软件全部操作（后端命令、AI 请求、前端交互、错误）实时记录。文件位置：{logDir || "…"}
+            软件全部操作（后端命令、AI 请求、前端交互、错误）实时记录。可框选文字后 Ctrl+C 复制。文件：{logDir || "…"}
           </div>
         </div>
         <div className="right" style={{ gap: 8, display: "flex" }}>

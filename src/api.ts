@@ -111,6 +111,8 @@ export const api = {
   videoThumbnail: (path: string) => invoke<string>("video_thumbnail", { path }),
   // asset delete (to recycle bin)
   deleteAsset: (path: string) => invoke<void>("delete_asset", { path }),
+  deleteLora: (path: string) => invoke<void>("delete_lora", { path }),
+  deletePlugin: (path: string) => invoke<void>("delete_plugin", { path }),
   // lora
   readTriggerWords: (loraPath: string) =>
     invoke<string[]>("read_trigger_words", { loraPath }),

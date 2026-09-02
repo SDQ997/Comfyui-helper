@@ -2,23 +2,41 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
 import { api, VideoMeta, assetUrl, fmtSize, fmtDuration } from "../api";
 
+type Mode = "compare" | "stack"; // 对比（左右滑块） | 堆叠（上下）
+
 export default function VideoPage() {
   const { toast } = useStore();
-  const [fileA, setFileA] = useState<string>("");
-  const [fileB, setFileB] = useState<string>("");
+  const [fileA, setFileA] = useState("");
+  const [fileB, setFileB] = useState("");
   const [metaA, setMetaA] = useState<VideoMeta | null>(null);
   const [metaB, setMetaB] = useState<VideoMeta | null>(null);
   const [urlA, setUrlA] = useState("");
   const [urlB, setUrlB] = useState("");
+  const [mode, setMode] = useState<Mode>("compare");
   const [slider, setSlider] = useState(50);
   const [ffStatus, setFfStatus] = useState<{ installed: boolean; version: string } | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     api.ffmpegStatus().then(setFfStatus).catch(() => setFfStatus({ installed: false, version: "" }));
   }, []);
+
+  // 元数据就绪后设定时间轴范围
+  useEffect(() => {
+    const d = Math.max(metaA?.duration_secs ?? 0, metaB?.duration_secs ?? 0);
+    setDuration(d);
+    setTime(0);
+    setPlaying(false);
+    if (videoARef.current) videoARef.current.pause();
+    if (videoBRef.current) videoBRef.current.pause();
+  }, [metaA, metaB]);
 
   const pick = useCallback(
     async (which: "a" | "b") => {
@@ -46,6 +64,45 @@ export default function VideoPage() {
     },
     [toast]
   );
+
+  // ---- 统一控制（联动两路）----
+  const togglePlay = () => {
+    const vs = [videoARef.current, videoBRef.current].filter(Boolean) as HTMLVideoElement[];
+    if (!vs.length) return;
+    if (playing) {
+      vs.forEach((v) => v.pause());
+      setPlaying(false);
+    } else {
+      // 已到结尾则从头开始
+      vs.forEach((v) => {
+        if (v.ended || v.currentTime >= (v.duration || 0) - 0.05) v.currentTime = 0;
+      });
+      const p = vs.map((v) => v.play()).filter((x) => x && typeof (x as Promise<void>).catch === "function");
+      Promise.all(p).catch(() => {});
+      setPlaying(true);
+    }
+  };
+  const toggleMute = () => {
+    const next = !muted;
+    if (videoARef.current) videoARef.current.muted = next;
+    if (videoBRef.current) videoBRef.current.muted = next;
+    setMuted(next);
+  };
+
+  const syncTime = (t: number) => {
+    setTime(t);
+    if (videoARef.current) videoARef.current.currentTime = t;
+    if (videoBRef.current) videoBRef.current.currentTime = t;
+    // 拖动时间轴视为手动定位，暂停联动播放
+    if (playing) {
+      setPlaying(false);
+      if (videoARef.current) videoARef.current.pause();
+      if (videoBRef.current) videoBRef.current.pause();
+    }
+  };
+
+  // 视频结束时更新 playing 状态（两端都结束后）
+  const onEnded = () => setPlaying(false);
 
   const onPointer = (clientX: number) => {
     const el = wrapRef.current;
@@ -90,14 +147,16 @@ export default function VideoPage() {
       </div>
     ) : null;
 
+  const bothLoaded = !!urlA && !!urlB;
+
   return (
     <div>
       <div className="page-h">
         <div>
           <h1>视频分析</h1>
           <div className="desc">
-            左右滑块对比两段视频（逻辑参考 pixop/video-compare），显示完整元数据。需要
-            ffmpeg（首次使用会引导下载）。
+            双视频对比 / 堆叠分析，输出完整元数据。选好视频后点「播放」两路同步开始（需
+            ffmpeg，首次使用会引导下载）。
           </div>
         </div>
       </div>
@@ -114,62 +173,158 @@ export default function VideoPage() {
       <div className="va-layout">
         <div className="va-main">
           <div className="toolbar">
-            <button className="btn btn-line btn-sm" onClick={() => pick("a")}>
-              📹 {fileA ? "替换" : "选择"}视频 A
+            <div className="seg" style={{ marginRight: 4 }}>
+              <div className={`b ${mode === "compare" ? "active" : ""}`} onClick={() => setMode("compare")}>
+                ◐ 对比
+              </div>
+              <div className={`b ${mode === "stack" ? "active" : ""}`} onClick={() => setMode("stack")}>
+                ☰ 堆叠
+              </div>
+            </div>
+            <button className="btn btn-line btn-sm" onClick={() => pick("a")} disabled={!!fileA && bothLoaded}>
+              📹 {fileA ? "A: " + fileA.split(/[\\/]/).pop()?.slice(0, 18) : "选择视频 A"}
             </button>
-            <button className="btn btn-line btn-sm" onClick={() => pick("b")}>
-              📹 {fileB ? "替换" : "选择"}视频 B
+            <button className="btn btn-line btn-sm" onClick={() => pick("b")} disabled={!!fileB && bothLoaded}>
+              📹 {fileB ? "B: " + fileB.split(/[\\/]/).pop()?.slice(0, 18) : "选择视频 B"}
             </button>
-            <span className="hint" style={{ flex: 1, textAlign: "right" }}>
-              {fileB ? "拖动滑块对比 A | B" : fileA ? "选择视频 B 开始对比" : "选择视频开始"}
-            </span>
+            <div className="spacer" />
+            {/* 统一控制 */}
+            <button
+              className={`btn ${playing ? "btn-line" : "btn-primary"} btn-sm`}
+              onClick={togglePlay}
+              disabled={!urlA && !urlB}
+              title="两路视频同时播放 / 暂停"
+            >
+              {playing ? "⏸ 暂停" : "▶ 播放"}
+            </button>
+            <button
+              className={`btn btn-sm ${muted ? "btn-ghost" : "btn-line"}`}
+              onClick={toggleMute}
+              disabled={!urlA && !urlB}
+              title="两路同时静音 / 出声"
+            >
+              {muted ? "🔇 静音" : "🔊 有声"}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => syncTime(0)} disabled={!bothLoaded}>
+              ↺ 重置
+            </button>
           </div>
 
-          <div
-            className="compare-wrap"
-            ref={wrapRef}
-            onPointerDown={(e) => {
-              dragging.current = true;
-              onPointer(e.clientX);
-            }}
-            onPointerMove={(e) => dragging.current && onPointer(e.clientX)}
-            onPointerUp={() => (dragging.current = false)}
-            onPointerLeave={() => (dragging.current = false)}
-          >
-            {urlA && <video className="frame" src={urlA} controls={false} muted loop autoPlay playsInline />}
-            {urlB && (
-              <div className="clip-right" style={{ clipPath: `inset(0 0 0 ${slider}%)` }}>
-                <video className="frame" src={urlB} controls={false} muted loop autoPlay playsInline />
-              </div>
-            )}
-            {urlB && (
-              <div className="divider" style={{ left: `${slider}%` }}>
-                <span />
-              </div>
-            )}
-            {urlA && <span className="label" style={{ left: 10 }}>A</span>}
-            {urlB && <span className="label" style={{ right: 10 }}>B</span>}
-            {!urlA && !urlB && (
-              <div className="empty" style={{ position: "absolute", inset: 0 }}>
-                <div className="big">◐</div>
-                <div className="tip">选择视频文件开始对比分析</div>
-              </div>
-            )}
-          </div>
+          {/* 对比模式：左右滑块重叠 */}
+          {mode === "compare" && (
+            <div
+              className="compare-wrap"
+              ref={wrapRef}
+              onPointerDown={(e) => {
+                dragging.current = true;
+                onPointer(e.clientX);
+              }}
+              onPointerMove={(e) => dragging.current && onPointer(e.clientX)}
+              onPointerUp={() => (dragging.current = false)}
+              onPointerLeave={() => (dragging.current = false)}
+            >
+              {urlA && (
+                <video
+                  ref={videoARef}
+                  className="frame"
+                  src={urlA}
+                  muted={muted}
+                  preload="metadata"
+                  playsInline
+                  onEnded={onEnded}
+                />
+              )}
+              {urlB && (
+                <div className="clip-right" style={{ clipPath: `inset(0 0 0 ${slider}%)` }}>
+                  <video
+                    ref={videoBRef}
+                    className="frame"
+                    src={urlB}
+                    muted={muted}
+                    preload="metadata"
+                    playsInline
+                    onEnded={onEnded}
+                  />
+                </div>
+              )}
+              {urlB && (
+                <div className="divider" style={{ left: `${slider}%` }}>
+                  <span />
+                </div>
+              )}
+              {urlA && <span className="label" style={{ left: 10 }}>A</span>}
+              {urlB && <span className="label" style={{ right: 10 }}>B</span>}
+              {!urlA && !urlB && (
+                <div className="empty" style={{ position: "absolute", inset: 0 }}>
+                  <div className="big">◐</div>
+                  <div className="tip">选择视频文件开始对比分析</div>
+                </div>
+              )}
+            </div>
+          )}
 
+          {/* 堆叠模式：上下排列，不重叠 */}
+          {mode === "stack" && (
+            <div className="stack-wrap">
+              <div className="stack-item">
+                <span className="label" style={{ top: 8, left: 8 }}>A</span>
+                {urlA ? (
+                  <video
+                    ref={videoARef}
+                    className="stack-video"
+                    src={urlA}
+                    muted={muted}
+                    preload="metadata"
+                    playsInline
+                    onEnded={onEnded}
+                  />
+                ) : (
+                  <div className="empty" style={{ height: "100%" }}>
+                    <div className="big">◐</div>
+                    <div className="tip">选择视频 A</div>
+                  </div>
+                )}
+              </div>
+              <div className="stack-divider" />
+              <div className="stack-item">
+                <span className="label" style={{ top: 8, left: 8 }}>B</span>
+                {urlB ? (
+                  <video
+                    ref={videoBRef}
+                    className="stack-video"
+                    src={urlB}
+                    muted={muted}
+                    preload="metadata"
+                    playsInline
+                    onEnded={onEnded}
+                  />
+                ) : (
+                  <div className="empty" style={{ height: "100%" }}>
+                    <div className="big">◐</div>
+                    <div className="tip">选择视频 B</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 时间轴（同步 seek） */}
           <div className="toolbar">
-            <span className="hint">播放同步时间：</span>
+            <span className="hint">时间轴：</span>
             <input
               type="range"
               min={0}
-              max={Math.max(1, (metaA?.duration_secs ?? 1) * 100)}
-              value={time * 100}
-              onChange={(e) => setTime(parseFloat(e.target.value) / 100)}
+              max={Math.max(1, duration * 100)}
+              value={Math.min(time, duration || 0) * 100}
+              onChange={(e) => syncTime(parseFloat(e.target.value) / 100)}
               style={{ flex: 1, accentColor: "var(--c-cyan)" }}
             />
             <span className="mono" style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--tx-2)" }}>
-              {fmtDuration(time)}
+              {fmtDuration(Math.min(time, duration || 0))} / {fmtDuration(duration)}
             </span>
+          </div>
+          <div className="hint" style={{ marginTop: -6 }}>
+            ▶ 播放 / ⏸ 暂停 / 🔊 声音按钮同时作用于两路视频；拖动时间轴会暂停并跳转到指定位置。
           </div>
         </div>
 

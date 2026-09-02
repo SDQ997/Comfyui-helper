@@ -5,7 +5,7 @@ import { api, ChatMessage } from "../api";
 export default function PromptPage() {
   const { config, toast } = useStore();
   const [userInput, setUserInput] = useState("");
-  const [templateId, setTemplateId] = useState<string>("default");
+  const [templateId, setTemplateId] = useState<string>(""); // 空 = 未选模板
   const [skillIds, setSkillIds] = useState<string[]>([]);
   const [manualSystem, setManualSystem] = useState("");
   const [useManual, setUseManual] = useState(false);
@@ -18,14 +18,28 @@ export default function PromptPage() {
   const skills = config?.skills ?? [];
   const defaultEp = endpoints.find((e) => e.id === config?.default_endpoint_id) ?? endpoints[0];
 
+  const toggleTemplate = (id: string) =>
+    setTemplateId((cur) => (cur === id ? "" : id)); // 再次点击取消选择
+
   const buildSystemPrompt = (): string => {
-    if (useManual) return manualSystem;
-    const tpl = templates.find((t) => t.id === templateId);
-    const skillContents = skills
+    // Skill 块：放在最前，避免被模板/手动指令覆盖弱化
+    const skillBlock = skills
       .filter((s) => skillIds.includes(s.id))
       .map((s) => `【Skill: ${s.name}】\n${s.content}`)
       .join("\n\n");
-    return [tpl?.content ?? "", skillContents].filter(Boolean).join("\n\n");
+
+    let base = "";
+    if (useManual) {
+      base = manualSystem.trim();
+    } else {
+      const tpl = templates.find((t) => t.id === templateId);
+      base = tpl?.content?.trim() ?? "";
+    }
+
+    const parts: string[] = [];
+    if (skillBlock) parts.push(skillBlock);
+    if (base) parts.push(base);
+    return parts.join("\n\n");
   };
 
   const generate = async () => {
@@ -39,7 +53,7 @@ export default function PromptPage() {
     }
     const sys = buildSystemPrompt();
     if (!sys.trim()) {
-      toast("请选择 System Prompt 模板或手动填写", "err");
+      toast("请选择 System Prompt 模板 / 勾选 Skill / 或开启手动填写", "err");
       return;
     }
     setBusy(true);
@@ -106,7 +120,7 @@ export default function PromptPage() {
               <textarea
                 className="txa mono"
                 rows={6}
-                placeholder="手动输入 system prompt…"
+                placeholder="手动输入 system prompt…（勾选的 Skill 会拼接在其后）"
                 value={manualSystem}
                 onChange={(e) => setManualSystem(e.target.value)}
               />
@@ -117,11 +131,18 @@ export default function PromptPage() {
                   <span
                     key={t.id}
                     className={`p ${templateId === t.id ? "active" : ""}`}
-                    onClick={() => setTemplateId(t.id)}
+                    title={templateId === t.id ? "再次点击取消选择" : "选择该模板"}
+                    onClick={() => toggleTemplate(t.id)}
                   >
                     {t.name}
+                    {templateId === t.id ? " ✕" : ""}
                   </span>
                 ))}
+              </div>
+            )}
+            {!useManual && templateId && (
+              <div className="hint" style={{ marginTop: 6 }}>
+                已选择模板；点选中的模板可取消。Skill 始终拼在模板之前生效。
               </div>
             )}
           </div>

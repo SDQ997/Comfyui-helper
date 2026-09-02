@@ -24,6 +24,23 @@ export default function PluginsPage() {
   const [filter, setFilter] = useState("all");
   const [logs, setLogs] = useState<{ text: string; cls: string }[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [armDeletePath, setArmDeletePath] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteOne = async (p: GitStatus) => {
+    setDeleting(true);
+    try {
+      await api.deletePlugin(p.path);
+      toast(`已删除插件 ${p.name}（进回收站）`, "ok");
+      setPlugins((ps) => ps.filter((x) => x.path !== p.path));
+      log(`✓ ${p.name} 已删除`, "ok");
+    } catch (e) {
+      toast(`删除失败: ${e}`, "err");
+      log(`✗ ${p.name} 删除失败: ${e}`, "err");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const activeDir = dirs[dirIdx] ?? "";
 
@@ -197,7 +214,7 @@ export default function PluginsPage() {
                 <th style={{ width: 110 }}>分支</th>
                 <th style={{ width: 120 }}>领先 / 落后</th>
                 <th style={{ width: 150 }}>最后提交</th>
-                <th style={{ width: 100 }}>操作</th>
+                <th style={{ width: 170 }}>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -228,13 +245,33 @@ export default function PluginsPage() {
                       {p.last_commit}
                     </td>
                     <td>
-                      <button
-                        className="btn btn-line btn-sm"
-                        onClick={() => updateOne(p)}
-                        disabled={p.status !== "behind" || updating[p.path]}
-                      >
-                        {updating[p.path] ? "更新中…" : "更新"}
-                      </button>
+                      <div className="row-ops">
+                        <button
+                          className="btn btn-line btn-sm"
+                          onClick={() => updateOne(p)}
+                          disabled={p.status !== "behind" || updating[p.path]}
+                        >
+                          {updating[p.path] ? "更新中…" : "更新"}
+                        </button>
+                        <button
+                          className={`btn btn-sm ${armDeletePath === p.path ? "btn-danger" : "btn-ghost"}`}
+                          disabled={deleting}
+                          onClick={() => {
+                            if (armDeletePath !== p.path) {
+                              setArmDeletePath(p.path);
+                              setTimeout(() => {
+                                setArmDeletePath((cur) => (cur === p.path ? "" : cur));
+                              }, 3500);
+                              return;
+                            }
+                            setArmDeletePath("");
+                            void deleteOne(p);
+                          }}
+                          title="删除插件文件夹（进回收站）"
+                        >
+                          {armDeletePath === p.path ? "确认删除？" : "🗑"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

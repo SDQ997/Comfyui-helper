@@ -3,6 +3,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Windows 下避免 spawn 控制台程序弹出黑色窗口
+#[cfg(windows)]
+const NO_WINDOW: u32 = 0x0800_0000; // CREATE_NO_WINDOW
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoMeta {
     pub path: String,
@@ -30,7 +34,10 @@ fn ffprobe_path() -> Result<std::path::PathBuf, String> {
 #[tauri::command]
 pub async fn video_metadata(path: String) -> Result<VideoMeta, String> {
     let probe = ffprobe_path()?;
-    let output = tokio::process::Command::new(&probe)
+    let mut cmd = tokio::process::Command::new(&probe);
+    #[cfg(windows)]
+    cmd.creation_flags(NO_WINDOW);
+    let output = cmd
         .args([
             "-v", "quiet",
             "-print_format", "json",
@@ -126,7 +133,10 @@ pub async fn extract_frames(
     let mut outs = Vec::new();
     for (i, ts) in timestamps.iter().enumerate() {
         let out_path = std::path::Path::new(&out_dir).join(format!("frame_{:05}.png", i));
-        let status = tokio::process::Command::new(&ffmpeg)
+        let mut cmd = tokio::process::Command::new(&ffmpeg);
+        #[cfg(windows)]
+        cmd.creation_flags(NO_WINDOW);
+        let status = cmd
             .args([
                 "-y",
                 "-ss",

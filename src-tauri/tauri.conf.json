@@ -19,6 +19,10 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
+        "decorations": false,
+        "transparent": false,
+        "shadow": true,
+        "center": true,
         "devtools": true,
         "backgroundColor": "#12151c"
       }

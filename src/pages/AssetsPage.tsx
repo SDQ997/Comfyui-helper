@@ -34,6 +34,15 @@ export default function AssetsPage() {
       const list = await api.scanAssets([activeDir]);
       setEntries(list);
 
+      // ffmpeg 是否可用：不可用则全部视频跳过抽帧（用原生 video 首帧兜底），避免刷屏
+      let ffAvailable = false;
+      try {
+        const st = await api.ffmpegStatus();
+        ffAvailable = !!st.installed;
+      } catch {
+        ffAvailable = false;
+      }
+
       // 所有资产的原地址（预览/播放用）+ 图片直接用原图做缩略图
       const mUrls: Record<string, string> = {};
       const tUrls: Record<string, string> = {};
@@ -50,8 +59,8 @@ export default function AssetsPage() {
               .then((u) => { tUrls[e.path] = u; })
               .catch(() => {})
           );
-        } else if (e.kind === "video") {
-          // 视频首帧缩略图（需 ffmpeg；失败则退回图标）
+        } else if (e.kind === "video" && ffAvailable) {
+          // 视频首帧缩略图（需 ffmpeg；失败则退回原生 video 首帧）
           jobs.push(
             api
               .videoThumbnail(e.path)
@@ -178,7 +187,7 @@ export default function AssetsPage() {
 
   const renderThumb = (e: AssetEntry) => {
     const u = thumbUrls[e.path];
-    if (u) return <img src={u} alt={e.name} loading="lazy" />;
+    if (u) return <img src={u} alt={e.name} loading="lazy" className="asset-thumb-img" />;
     // 视频无 ffmpeg 首帧时：用原生 video 元素取首帧。仅当视频总数少时启用，
     // 避免一次渲染上千个 video 元素卡 UI；数量大时安装 ffmpeg 后自动有缩略图。
     if (
@@ -196,7 +205,13 @@ export default function AssetsPage() {
         />
       );
     }
-    return <span className="kind-ico">{KIND_ICO[e.kind] ?? "·"}</span>;
+    // 未就绪占位（避免闪烁）：图标 + 缩略图生成中提示
+    return (
+      <span className="thumb-ph">
+        <span className="kind-ico">{KIND_ICO[e.kind] ?? "·"}</span>
+        {e.kind === "video" && <span className="ph-tip">生成缩略图中…</span>}
+      </span>
+    );
   };
 
   const videoUrl = (p: string) => mediaUrls[p];
@@ -255,14 +270,26 @@ export default function AssetsPage() {
         </div>
         <div className="spacer" />
         {!viewHidden ? (
-          <button
-            className="btn btn-line btn-sm"
-            onClick={hideAllVisible}
-            disabled={unhiddenCount(tab) === 0}
-            title="将当前标签下所有未隐藏资产设为模糊展示"
-          >
-            ⤓ 全部隐藏{unhiddenCount(tab) > 0 ? ` (${unhiddenCount(tab)})` : ""}
-          </button>
+          // 状态化切换：当前标签下存在已隐藏项 → 显示「全部显示」；否则显示「全部隐藏」
+          hiddenCounts[tab] > 0 ? (
+            <button
+              className="btn btn-line btn-sm"
+              onClick={restoreAllHidden}
+              disabled={hiddenCounts[tab] === 0}
+              title="恢复当前标签下所有已隐藏资产"
+            >
+              ⇪ 全部显示{hiddenCounts[tab] ? ` (${hiddenCounts[tab]})` : ""}
+            </button>
+          ) : (
+            <button
+              className="btn btn-line btn-sm"
+              onClick={hideAllVisible}
+              disabled={unhiddenCount(tab) === 0}
+              title="将当前标签下所有资产设为模糊展示"
+            >
+              ⤓ 全部隐藏{unhiddenCount(tab) > 0 ? ` (${unhiddenCount(tab)})` : ""}
+            </button>
+          )
         ) : (
           <button
             className="btn btn-line btn-sm"

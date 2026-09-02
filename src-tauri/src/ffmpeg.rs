@@ -5,7 +5,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use tauri::Emitter;
+
+/// Windows 下避免 spawn 控制台程序弹出黑色窗口
+#[cfg(windows)]
+const NO_WINDOW: u32 = 0x0800_0000; // CREATE_NO_WINDOW
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FfmpegStatus {
@@ -48,8 +54,10 @@ fn system_ffmpeg() -> Option<(PathBuf, PathBuf)> {
 }
 
 fn probe_version(ffmpeg: &PathBuf) -> String {
-    std::process::Command::new(ffmpeg)
-        .arg("-version")
+    let mut cmd = std::process::Command::new(ffmpeg);
+    #[cfg(windows)]
+    cmd.creation_flags(NO_WINDOW);
+    cmd.arg("-version")
         .output()
         .ok()
         .and_then(|o| String::from_utf8(o.stdout).ok())
@@ -240,7 +248,10 @@ pub async fn download_ffmpeg(
 
     // 解压：Windows 上用 tar（Win10+ 自带 bsdtar，支持 zip）
     let _ = app.emit("ffmpeg_download_stage", "正在解压…");
-    let status = std::process::Command::new("tar")
+    let mut tarcmd = std::process::Command::new("tar");
+    #[cfg(windows)]
+    tarcmd.creation_flags(NO_WINDOW);
+    let status = tarcmd
         .args(["-xf"])
         .arg(&zip_path)
         .current_dir(&dir)

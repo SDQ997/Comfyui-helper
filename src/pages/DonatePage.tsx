@@ -14,13 +14,17 @@ export default function DonatePage() {
         <div className="donate-grid">
           <div className="qr-card">
             <div className="qr-title">微信支付</div>
-            <img src="/donate/wechat.jpg" alt="微信收款码" style={{ width: 140, borderRadius: 6 }} />
+            <div className="qr-frame">
+              <img src="/donate/wechat.jpg" alt="微信收款码" />
+            </div>
             <div className="qr-sub">打开微信 → 扫一扫</div>
           </div>
 
           <div className="qr-card">
             <div className="qr-title">支付宝</div>
-            <img src="/donate/alipay.jpg" alt="支付宝收款码" style={{ width: 140, borderRadius: 6 }} />
+            <div className="qr-frame">
+              <img src="/donate/alipay.jpg" alt="支付宝收款码" />
+            </div>
             <div className="qr-sub">打开支付宝 → 扫一扫</div>
           </div>
         </div>

@@ -13,6 +13,7 @@ export default function LoraPage() {
   const [editing, setEditing] = useState<LoraEntry | null>(null);
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [armDeletePath, setArmDeletePath] = useState("");
 
   const activeDir = dirs[dirIdx] ?? "";
 
@@ -128,6 +129,17 @@ export default function LoraPage() {
     }
   };
 
+  // 删除整个 LoRA（同名 .txt 一并进回收站）
+  const deleteOne = async (e: LoraEntry) => {
+    try {
+      await api.deleteLora(e.path);
+      toast(`已删除 ${e.name}（进回收站）`, "ok");
+      await rescan();
+    } catch (err) {
+      toast(`删除失败: ${err}`, "err");
+    }
+  };
+
   return (
     <div>
       <div className="page-h">
@@ -190,8 +202,7 @@ export default function LoraPage() {
                 <th>名称</th>
                 <th>触发词（点击词复制，× 删除）</th>
                 <th style={{ width: 90 }}>大小</th>
-                <th style={{ width: 90 }}>状态</th>
-                <th style={{ width: 110 }}>操作</th>
+                <th style={{ width: 170 }}>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -242,14 +253,26 @@ export default function LoraPage() {
                   </td>
                   <td className="mono">{fmtSize(e.size)}</td>
                   <td>
-                    {e.has_txt ? (
-                      <span className="pill ok"><i className="d" />有 txt</span>
-                    ) : (
-                      <span className="pill warn"><i className="d" />无 .txt</span>
-                    )}
-                  </td>
-                  <td>
-                    <button className="btn btn-line btn-sm" onClick={() => openEditor(e)}>编辑</button>
+                    <div className="row-ops">
+                      <button className="btn btn-line btn-sm" onClick={() => openEditor(e)}>编辑</button>
+                      <button
+                        className={`btn btn-sm ${armDeletePath === e.path ? "btn-danger" : "btn-ghost"}`}
+                        onClick={() => {
+                          if (armDeletePath !== e.path) {
+                            setArmDeletePath(e.path);
+                            setTimeout(() => {
+                              setArmDeletePath((cur) => (cur === e.path ? "" : cur));
+                            }, 3500);
+                            return;
+                          }
+                          setArmDeletePath("");
+                          void deleteOne(e);
+                        }}
+                        title="删除该 LoRA（同名 .txt 一并删除，进回收站）"
+                      >
+                        {armDeletePath === e.path ? "确认删除？" : "🗑"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

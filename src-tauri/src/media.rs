@@ -6,9 +6,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Mutex;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 use crate::config::AppConfig;
 use crate::AppState;
+
+/// Windows 下避免 spawn 控制台程序弹出黑色窗口
+#[cfg(windows)]
+const NO_WINDOW: u32 = 0x0800_0000; // CREATE_NO_WINDOW
 
 // ---------------- 隐藏列表 ----------------
 
@@ -154,7 +160,10 @@ pub fn video_thumbnail(path: String) -> Result<String, String> {
     let (pair, _src) = crate::ffmpeg::find_ffmpeg();
     let (ff, _fp) = pair.ok_or("未检测到 ffmpeg，请先在「设置 → FFmpeg」中安装")?;
 
-    let status = std::process::Command::new(&ff)
+    let mut cmd = std::process::Command::new(&ff);
+    #[cfg(windows)]
+    cmd.creation_flags(NO_WINDOW);
+    let status = cmd
         .args([
             "-y",
             "-ss", "0",
@@ -211,17 +220,75 @@ pub fn delete_asset(path: String) -> Result<(), String> {
 
 /// 通过 PowerShell + Microsoft.VisualBasic 移动文件到回收站
 fn send_to_recycle_bin(p: &std::path::Path) -> bool {
+    recycle_generic(p, false)
+}
+
+/// 通过 PowerShell + Microsoft.VisualBasic 移动目录到回收站
+fn send_to_recycle_dir(p: &std::path::Path) -> bool {
+    recycle_generic(p, true)
+}
+
+fn recycle_generic(p: &std::path::Path, is_dir: bool) -> bool {
     let path = p.to_string_lossy().replace('\'', "''");
+    let method = if is_dir { "DeleteDirectory" } else { "DeleteFile" };
+    let arg = format!("'{path}','OnlyErrorDialogs','SendToRecycleBin'");
     let ps = format!(
         "Add-Type -AssemblyName Microsoft.VisualBasic; \
-         [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('{path}','OnlyErrorDialogs','SendToRecycleBin')"
+         [Microsoft.VisualBasic.FileIO.FileSystem]::{method}({arg})"
     );
-    std::process::Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+    let mut cmd = std::process::Command::new("powershell");
+    #[cfg(windows)]
+    cmd.creation_flags(NO_WINDOW);
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+/// 删除 LoRA：同名 .safetensors/.pt + 同名 .txt 一并移入回收站
+#[tauri::command]
+pub fn delete_lora(lora_path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&lora_path);
+    if !p.exists() {
+        return Err(format!("文件不存在: {lora_path}"));
+    }
+    log::info!("delete_lora: {lora_path}");
+    let txt = p.with_extension("txt");
+    // 主文件进回收站；失败才直接删除
+    if !send_to_recycle_bin(&p) {
+        std::fs::remove_file(&p).map_err(|e| format!("删除失败: {e}"))?;
+    }
+    // 同名 txt 一并处理
+    if txt.exists() {
+        if !send_to_recycle_bin(&txt) {
+            let _ = std::fs::remove_file(&txt);
+        }
+    }
+    Ok(())
+}
+
+/// 删除插件目录（custom_nodes 下的整个文件夹）→ 移入回收站
+#[tauri::command]
+pub fn delete_plugin(dir: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&dir);
+    if !p.is_dir() {
+        return Err(format!("目录不存在: {dir}"));
+    }
+    log::info!("delete_plugin: {dir}");
+    // 安全护栏：仅允许删除"custom_nodes/xxx"这种二级子目录，防止误删根目录
+    let parent_ok = p
+        .parent()
+        .map(|par| par.file_name().map(|n| n == std::ffi::OsStr::new("custom_nodes")).unwrap_or(false))
+        .unwrap_or(false);
+    if !parent_ok {
+        return Err("仅允许删除 custom_nodes 目录下的插件子目录".into());
+    }
+    if !send_to_recycle_dir(&p) {
+        // 回收站失败回退：递归删除
+        std::fs::remove_dir_all(&p).map_err(|e| format!("删除失败: {e}"))?;
+    }
+    Ok(())
 }

@@ -14,6 +14,21 @@ pub struct ModelInfo {
     pub id: String,
 }
 
+/// 归一化 Base URL：容忍用户多填了路径（如 .../v1/chat/completions 或带尾斜杠）。
+fn endpoint_url(base: &str, tail: &str) -> String {
+    let b = base.trim();
+    if b.is_empty() {
+        return tail.to_string();
+    }
+    let b = b.trim_end_matches('/');
+    // 若用户填的地址已包含目标路径（大小写不敏感），不再重复拼接
+    if b.to_lowercase().ends_with(&format!("/{tail}").to_lowercase()) {
+        b.to_string()
+    } else {
+        format!("{b}/{tail}")
+    }
+}
+
 /// 拉取 /v1/models 列表（OpenAI 兼容格式；Ollama 也支持该端点）
 #[tauri::command]
 pub async fn list_models(endpoint: ApiEndpoint) -> Result<Vec<ModelInfo>, String> {
@@ -24,7 +39,7 @@ pub async fn list_models(endpoint: ApiEndpoint) -> Result<Vec<ModelInfo>, String
         .build()
         .map_err(|e| e.to_string())?;
 
-    let url = format!("{}/models", endpoint.base_url.trim_end_matches('/'));
+    let url = endpoint_url(&endpoint.base_url, "models");
     let mut req = client.get(&url);
     if !endpoint.api_key.is_empty() {
         req = req.bearer_auth(&endpoint.api_key);
@@ -60,7 +75,7 @@ pub async fn chat_completion(
         .build()
         .map_err(|e| e.to_string())?;
 
-    let url = format!("{}/chat/completions", endpoint.base_url.trim_end_matches('/'));
+    let url = endpoint_url(&endpoint.base_url, "chat/completions");
     let body = serde_json::json!({
         "model": endpoint.model,
         "messages": messages,
@@ -75,8 +90,7 @@ pub async fn chat_completion(
 
     let _ = &app; // 预留：流式时用 app.emit 发送 chunk 事件
     log::info!(
-        "chat_completion 开始 → {} (model={}, messages={}, temp={:?})",
-        endpoint.base_url,
+        "chat_completion 开始 → {url} (model={}, messages={}, temp={:?})",
         endpoint.model,
         messages.len(),
         temperature
