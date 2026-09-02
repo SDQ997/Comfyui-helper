@@ -3,6 +3,7 @@ import { useStore } from "../store";
 import { api, VideoMeta, assetUrl, fmtSize, fmtDuration } from "../api";
 
 type Mode = "compare" | "stack"; // 对比（左右滑块） | 堆叠（上下）
+type Fit = "contain" | "cover"; // 适应（等比留黑边） | 填充（裁切对齐）
 
 export default function VideoPage() {
   const { toast } = useStore();
@@ -13,6 +14,7 @@ export default function VideoPage() {
   const [urlA, setUrlA] = useState("");
   const [urlB, setUrlB] = useState("");
   const [mode, setMode] = useState<Mode>("compare");
+  const [fit, setFit] = useState<Fit>("contain");
   const [slider, setSlider] = useState(50);
   const [ffStatus, setFfStatus] = useState<{ installed: boolean; version: string } | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -149,6 +151,12 @@ export default function VideoPage() {
 
   const bothLoaded = !!urlA && !!urlB;
 
+  // 对比框宽高比：跟随视频 A（未选时 16:9）；比例不一致时提示用填充模式对齐
+  const arA = metaA && metaA.width > 0 ? metaA.width / metaA.height : 16 / 9;
+  const ratioMismatch =
+    metaA && metaB && Math.abs(metaA.width / metaA.height - metaB.width / metaB.height) > 0.01;
+  const objectFit = fit;
+
   return (
     <div>
       <div className="page-h">
@@ -181,6 +189,16 @@ export default function VideoPage() {
                 ☰ 堆叠
               </div>
             </div>
+            {mode === "compare" && (
+              <div className="seg" style={{ marginRight: 4 }} title="比例不一致时的对齐方式：填充=裁切对齐无黑边，适应=等比完整显示">
+                <div className={`b ${fit === "cover" ? "active" : ""}`} onClick={() => setFit("cover")}>
+                  填充
+                </div>
+                <div className={`b ${fit === "contain" ? "active" : ""}`} onClick={() => setFit("contain")}>
+                  适应
+                </div>
+              </div>
+            )}
             <button className="btn btn-line btn-sm" onClick={() => pick("a")} disabled={!!fileA && bothLoaded}>
               📹 {fileA ? "A: " + fileA.split(/[\\/]/).pop()?.slice(0, 18) : "选择视频 A"}
             </button>
@@ -210,11 +228,12 @@ export default function VideoPage() {
             </button>
           </div>
 
-          {/* 对比模式：左右滑块重叠 */}
+          {/* 对比模式：左右滑块重叠（宽高比跟随 A，objectFit 可切换填充/适应） */}
           {mode === "compare" && (
             <div
               className="compare-wrap"
               ref={wrapRef}
+              style={{ aspectRatio: String(arA) }}
               onPointerDown={(e) => {
                 dragging.current = true;
                 onPointer(e.clientX);
@@ -227,6 +246,7 @@ export default function VideoPage() {
                 <video
                   ref={videoARef}
                   className="frame"
+                  style={{ objectFit }}
                   src={urlA}
                   muted={muted}
                   preload="metadata"
@@ -239,6 +259,7 @@ export default function VideoPage() {
                   <video
                     ref={videoBRef}
                     className="frame"
+                    style={{ objectFit }}
                     src={urlB}
                     muted={muted}
                     preload="metadata"
@@ -305,6 +326,14 @@ export default function VideoPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* 比例不一致提示 */}
+          {ratioMismatch && (
+            <div className="hint" style={{ marginTop: -6 }}>
+              ⚠ A 与 B 宽高比不同（{metaA!.width}×{metaA!.height} vs {metaB!.width}×{metaB!.height}）：
+              「填充」会裁切 B 对齐 A 的画面；「适应」完整显示但可能有黑边。
             </div>
           )}
 

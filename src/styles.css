@@ -584,7 +584,9 @@ label { vertical-align: middle; }
   height: 3px; background: var(--c-cyan); box-shadow: 0 0 10px var(--c-cyan-glow);
   position: relative; z-index: 3; flex: none;
 }
-.compare-wrap img.frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.compare-wrap img.frame, .compare-wrap video.frame {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+}
 .compare-wrap .clip-right { position: absolute; inset: 0; overflow: hidden; }
 .compare-wrap .divider {
   position: absolute; top: 0; bottom: 0; width: 2px; background: var(--c-cyan);
