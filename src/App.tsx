@@ -105,9 +105,6 @@ export default function App() {
           <b>{pageLabel}</b>
         </div>
         <div className="spacer" data-tauri-drag-region />
-        <button className="tb-donate" onClick={() => setPage("donate")}>
-          ♥ 捐赠
-        </button>
         <div className="win-ctrl">
           <button className="wc" title="最小化" onClick={winMin}>
             <svg width="10" height="10" viewBox="0 0 10 10">

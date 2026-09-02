@@ -254,7 +254,7 @@ export default function PluginsPage() {
                           {updating[p.path] ? "更新中…" : "更新"}
                         </button>
                         <button
-                          className={`btn btn-sm ${armDeletePath === p.path ? "btn-danger" : "btn-ghost"}`}
+                          className={`btn btn-sm btn-danger ${armDeletePath === p.path ? "armed" : "btn-danger-soft"}`}
                           disabled={deleting}
                           onClick={() => {
                             if (armDeletePath !== p.path) {

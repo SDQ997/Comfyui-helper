@@ -51,6 +51,11 @@ export default function VideoPage() {
       try {
         const meta = await api.videoMetadata(sel);
         const url = await assetUrl(sel);
+        // 重选视频：先暂停并复位时间轴，避免旧播放状态残留
+        if (videoARef.current) videoARef.current.pause();
+        if (videoBRef.current) videoBRef.current.pause();
+        setPlaying(false);
+        setTime(0);
         if (which === "a") {
           setFileA(sel);
           setMetaA(meta);
@@ -199,10 +204,10 @@ export default function VideoPage() {
                 </div>
               </div>
             )}
-            <button className="btn btn-line btn-sm" onClick={() => pick("a")} disabled={!!fileA && bothLoaded}>
+            <button className="btn btn-line btn-sm" onClick={() => pick("a")} title="重新选择会替换当前视频 A 并暂停播放">
               📹 {fileA ? "A: " + fileA.split(/[\\/]/).pop()?.slice(0, 18) : "选择视频 A"}
             </button>
-            <button className="btn btn-line btn-sm" onClick={() => pick("b")} disabled={!!fileB && bothLoaded}>
+            <button className="btn btn-line btn-sm" onClick={() => pick("b")} title="重新选择会替换当前视频 B 并暂停播放">
               📹 {fileB ? "B: " + fileB.split(/[\\/]/).pop()?.slice(0, 18) : "选择视频 B"}
             </button>
             <div className="spacer" />

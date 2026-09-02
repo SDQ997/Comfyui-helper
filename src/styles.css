@@ -253,6 +253,11 @@ body {
 .btn-ghost:hover { background: var(--bg-4); color: var(--tx-1); }
 .btn-danger { background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.3); color: var(--c-red); }
 .btn-danger:hover { background: rgba(248, 113, 113, 0.18); }
+/* 删除按钮：常态即红色描边醒目；确认态实心红 */
+.btn-danger-soft { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.45); color: #f87171; }
+.btn-danger-soft:hover { background: rgba(248, 113, 113, 0.22); border-color: rgba(248, 113, 113, 0.6); }
+.btn-danger.armed { background: #e5484d; border-color: #e5484d; color: #fff; }
+.btn-danger.armed:hover { background: #d93b40; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Inputs */

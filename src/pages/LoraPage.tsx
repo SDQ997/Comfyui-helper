@@ -256,7 +256,7 @@ export default function LoraPage() {
                     <div className="row-ops">
                       <button className="btn btn-line btn-sm" onClick={() => openEditor(e)}>编辑</button>
                       <button
-                        className={`btn btn-sm ${armDeletePath === e.path ? "btn-danger" : "btn-ghost"}`}
+                        className={`btn btn-sm btn-danger ${armDeletePath === e.path ? "armed" : "btn-danger-soft"}`}
                         onClick={() => {
                           if (armDeletePath !== e.path) {
                             setArmDeletePath(e.path);
