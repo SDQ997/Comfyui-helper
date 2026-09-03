@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useStore } from "./store";
+import { applyTheme } from "./theme";
 import PromptPage from "./pages/PromptPage";
 import AssetsPage from "./pages/AssetsPage";
 import LoraPage from "./pages/LoraPage";
@@ -29,11 +30,7 @@ export default function App() {
 
   // 主题切换：根据 config.general.theme 在 <html> 挂 data-theme
   useEffect(() => {
-    const theme = config?.general?.theme === "light" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", theme);
-    // 同步 index.html 防白屏底色（首帧一致）
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "light" ? "#eef1f6" : "#12151c");
+    applyTheme(config?.general?.theme);
   }, [config?.general?.theme]);
 
   // 标题栏最大化状态监听

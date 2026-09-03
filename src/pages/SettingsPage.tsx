@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import { api, AppConfig } from "../api";
+import { applyTheme } from "../theme";
 
 type FfStatus = {
   installed: boolean; source: string; ffmpeg_path: string; ffprobe_path: string;
@@ -54,9 +55,16 @@ export default function SettingsPage() {
   // 主题预览：draft 一变就同步 <html data-theme>（真正持久化靠保存）
   useEffect(() => {
     if (!draft?.general?.theme) return;
-    const t = draft.general.theme === "light" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", t);
+    applyTheme(draft.general.theme);
   }, [draft?.general?.theme]);
+
+  // 离开设置页时恢复已保存的主题：预览改了但没点保存，全局不能停留在预览色
+  useEffect(() => {
+    return () => {
+      const saved = useStore.getState().config?.general?.theme;
+      applyTheme(saved);
+    };
+  }, []);
 
   const d = draft; // 简写
 
