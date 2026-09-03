@@ -10,7 +10,8 @@ type FfStatus = {
 const SECTIONS = [
   { key: "api", label: "模型 API", ico: "◈" },
   { key: "dirs", label: "目录", ico: "📁" },
-  { key: "prompts", label: "提示词库", ico: "✦" },
+  { key: "prompts", label: "System Prompt", ico: "✦" },
+  { key: "skills", label: "Skills", ico: "⚡" },
   { key: "general", label: "通用", ico: "⚙" },
   { key: "ffmpeg", label: "FFmpeg", ico: "▶" },
   { key: "about", label: "关于", ico: "ⓘ" },
@@ -360,111 +361,112 @@ export default function SettingsPage() {
           )}
 
           {section === "prompts" && (
-            <div>
-              <div className="card">
-                <h3>
-                  <span className="num">03</span>System Prompt 模板
-                  <button className="btn btn-line btn-sm" style={{ marginLeft: "auto" }} onClick={addTemplate}>
-                    ＋ 新建模板
-                  </button>
-                </h3>
-                <div className="desc" style={{ marginBottom: 12 }}>
-                  在「提示词助手」中选择使用的模板；也可勾选「手动填写」直接用输入框写。
-                </div>
-                {cfg.templates.map((t, idx) => (
-                  <div key={t.id} className="prompt-editor">
-                    <div className="set-row">
-                      <div className="input" style={{ width: 220 }}>
-                        <input value={t.name} placeholder={`模板 ${idx + 1}`} onChange={(e) => patchTemplate(t.id, { name: e.target.value })} />
-                      </div>
-                      <button className="btn btn-danger btn-sm" onClick={() => removeTemplate(t.id)} title="删除该模板">删除</button>
+            <div className="card">
+              <h3>
+                <span className="num">03</span>System Prompt 模板
+                <span className="tag cyan">{cfg.templates.length} 个</span>
+                <button className="btn btn-line btn-sm" style={{ marginLeft: "auto" }} onClick={addTemplate}>
+                  ＋ 新建模板
+                </button>
+              </h3>
+              <div className="desc" style={{ marginBottom: 12 }}>
+                在「提示词助手」中选择使用的模板（可选增强）；也可勾选「手动填写」直接用输入框写。
+              </div>
+              {cfg.templates.map((t, idx) => (
+                <div key={t.id} className="prompt-editor">
+                  <div className="set-row">
+                    <div className="input" style={{ width: 220 }}>
+                      <input value={t.name} placeholder={`模板 ${idx + 1}`} onChange={(e) => patchTemplate(t.id, { name: e.target.value })} />
                     </div>
-                    <textarea className="txa mono" rows={5} placeholder="System Prompt 内容…" value={t.content}
-                      onChange={(e) => patchTemplate(t.id, { content: e.target.value })} style={{ marginTop: 8 }} />
+                    <button className="btn btn-danger btn-sm" onClick={() => removeTemplate(t.id)} title="删除该模板">删除</button>
                   </div>
-                ))}
-                {cfg.templates.length === 0 && (
-                  <div className="hint">暂无模板。可点击上方「新建模板」开始维护。</div>
-                )}
-              </div>
-
-              <div className="card" style={{ marginTop: 14 }}>
-                <h3>
-                  <span className="num">04</span>Skills
-                  <span className="tag cyan">{cfg.skills.length} 个</span>
-                  <button className="btn btn-line btn-sm" style={{ marginLeft: "auto" }} onClick={importSkillFile}>⇩ 导入 .md Skill</button>
-                  <button className="btn btn-primary btn-sm" onClick={() => addSkill("新 Skill", "")}>＋ 新建</button>
-                </h3>
-                <div className="desc" style={{ marginBottom: 12 }}>
-                  导入/维护提示词技能片段，在「提示词助手」里按需勾选，会拼接到 System Prompt 中。
+                  <textarea className="txa mono" rows={5} placeholder="System Prompt 内容…" value={t.content}
+                    onChange={(e) => patchTemplate(t.id, { content: e.target.value })} style={{ marginTop: 8 }} />
                 </div>
-                {cfg.skills.map((s) => {
-                  const open = expandedSkills.has(s.id);
-                  return (
-                    <div
-                      key={s.id}
-                      className={`prompt-editor ${open ? "open" : ""}`}
-                      style={{ opacity: s.enabled ? 1 : 0.55 }}
-                    >
-                      <div className="set-row" onClick={() => toggleSkillExpand(s.id)} style={{ cursor: "pointer" }}>
-                        <span className="skill-arrow" title={open ? "收起" : "展开内容"}>
-                          {open ? "▾" : "▸"}
-                        </span>
-                        <div className="input" style={{ flex: 1 }}>
-                          <span className="ico">✦</span>
-                          <input
-                            value={s.name}
-                            placeholder="Skill 名称"
-                            onClick={(ev) => ev.stopPropagation()}
-                            onChange={(e) => patchSkill(s.id, { name: e.target.value })}
-                          />
-                        </div>
-                        <span className="hint" style={{ whiteSpace: "nowrap" }}>
-                          {s.content.length} 字
-                        </span>
-                        <label
-                          style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}
-                          onClick={(ev) => ev.stopPropagation()}
-                        >
-                          <div
-                            className={`toggle ${s.enabled ? "on" : ""}`}
-                            onClick={() => patchSkill(s.id, { enabled: !s.enabled })}
-                          />
-                          <span className="hint">启用</span>
-                        </label>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            removeSkill(s.id);
-                          }}
-                          title="删除该 Skill"
-                        >
-                          删除
-                        </button>
-                      </div>
-                      {open && (
-                        <>
-                          <textarea
-                            className="txa mono"
-                            rows={5}
-                            placeholder="Skill 内容（规则 / 说明 / 示例）…"
-                            value={s.content}
-                            onChange={(e) => patchSkill(s.id, { content: e.target.value })}
-                            style={{ marginTop: 8 }}
-                          />
-                          <div className="hint" style={{ marginTop: 6 }}>
-                            将作为 <span className="mono">【Skill: {s.name}】</span> 拼接到 System Prompt（提示词助手勾选时生效）。
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-                {cfg.skills.length === 0 && (
-                  <div className="hint">暂无 Skill。可点击「导入 .md Skill」从本地文件导入，或点「新建」手动创建。</div>
-                )}
+              ))}
+              {cfg.templates.length === 0 && (
+                <div className="hint">暂无模板。可点击右上「新建模板」开始维护。</div>
+              )}
+            </div>
+          )}
+
+          {section === "skills" && (
+            <div className="card">
+              <h3>
+                <span className="num">04</span>Skills
+                <span className="tag cyan">{cfg.skills.length} 个</span>
+                <button className="btn btn-line btn-sm" style={{ marginLeft: "auto" }} onClick={importSkillFile}>⇩ 导入 .md Skill</button>
+                <button className="btn btn-primary btn-sm" onClick={() => addSkill("新 Skill", "")}>＋ 新建</button>
+              </h3>
+              <div className="desc" style={{ marginBottom: 12 }}>
+                导入/维护提示词技能片段，在「提示词助手」里按需勾选（可选增强），会拼接到 System Prompt 最前。
               </div>
+              {cfg.skills.map((s) => {
+                const open = expandedSkills.has(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    className={`prompt-editor ${open ? "open" : ""}`}
+                    style={{ opacity: s.enabled ? 1 : 0.55 }}
+                  >
+                    <div className="set-row" onClick={() => toggleSkillExpand(s.id)} style={{ cursor: "pointer" }}>
+                      <span className="skill-arrow" title={open ? "收起" : "展开内容"}>
+                        {open ? "▾" : "▸"}
+                      </span>
+                      <div className="input" style={{ flex: 1 }}>
+                        <span className="ico">✦</span>
+                        <input
+                          value={s.name}
+                          placeholder="Skill 名称"
+                          onClick={(ev) => ev.stopPropagation()}
+                          onChange={(e) => patchSkill(s.id, { name: e.target.value })}
+                        />
+                      </div>
+                      <span className="hint" style={{ whiteSpace: "nowrap" }}>
+                        {s.content.length} 字
+                      </span>
+                      <label
+                        style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        <div
+                          className={`toggle ${s.enabled ? "on" : ""}`}
+                          onClick={() => patchSkill(s.id, { enabled: !s.enabled })}
+                        />
+                        <span className="hint">启用</span>
+                      </label>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          removeSkill(s.id);
+                        }}
+                        title="删除该 Skill"
+                      >
+                        删除
+                      </button>
+                    </div>
+                    {open && (
+                      <>
+                        <textarea
+                          className="txa mono"
+                          rows={5}
+                          placeholder="Skill 内容（规则 / 说明 / 示例）…"
+                          value={s.content}
+                          onChange={(e) => patchSkill(s.id, { content: e.target.value })}
+                          style={{ marginTop: 8 }}
+                        />
+                        <div className="hint" style={{ marginTop: 6 }}>
+                          将作为 <span className="mono">【Skill: {s.name}】</span> 拼接到 System Prompt（提示词助手勾选时生效）。
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+              {cfg.skills.length === 0 && (
+                <div className="hint">暂无 Skill。可点击「导入 .md Skill」从本地文件导入，或点「新建」手动创建。</div>
+              )}
             </div>
           )}
 
