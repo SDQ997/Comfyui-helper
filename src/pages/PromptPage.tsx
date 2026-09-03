@@ -110,11 +110,8 @@ export default function PromptPage() {
       toast("请填写提示词内容", "err");
       return;
     }
+    // System Prompt 模板 / Skill / 手动填写均为可选：一个都没选时直接用用户输入生成
     const sys = buildSystemPrompt();
-    if (!sys.trim()) {
-      toast("请选择 System Prompt 模板 / 勾选 Skill / 或开启手动填写", "err");
-      return;
-    }
     setBusy(true);
     setOutput("");
     try {
@@ -126,10 +123,9 @@ export default function PromptPage() {
           ...images.map((im) => ({ type: "image_url", image_url: { url: im.dataUrl } })),
         ];
       }
-      const messages: ChatMessage[] = [
-        { role: "system", content: sys },
-        { role: "user", content: userContent },
-      ];
+      const messages: ChatMessage[] = [];
+      if (sys.trim()) messages.push({ role: "system", content: sys });
+      messages.push({ role: "user", content: userContent });
       const result = await api.chatCompletion(defaultEp, messages, temperature);
       setOutput(result);
       toast("生成完成", "ok");
@@ -156,8 +152,8 @@ export default function PromptPage() {
         <div>
           <h1>提示词助手</h1>
           <div className="desc">
-            填写需求、选择 Skill 与 System Prompt 模板，让 AI 把口述想法润色成可用的 ComfyUI /
-            视频生成提示词。
+            填写需求即可直接生成；也可选择 Skill 与 System Prompt 模板让 AI
+            按特定风格润色成 ComfyUI / 视频生成提示词。
           </div>
         </div>
       </div>
@@ -209,7 +205,7 @@ export default function PromptPage() {
             )}
             {!useManual && templateId && (
               <div className="hint" style={{ marginTop: 6 }}>
-                已选择模板；点选中的模板可取消。Skill 始终拼在模板之前生效。
+                已选择模板；点选中的模板可取消。模板与 Skill 均为可选，不选直接生成。
               </div>
             )}
           </div>
