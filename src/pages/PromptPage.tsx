@@ -1,19 +1,108 @@
 import { useRef, useState } from "react";
-import { useStore } from "../store";
+import { useStore, PromptHistoryEntry } from "../store";
 import { api, ChatMessage } from "../api";
 
+/* ---------- 历史条目：收拢/展开 + 分段复制 ---------- */
+function HistoryItem({ item }: { item: PromptHistoryEntry }) {
+  const { toast } = useStore();
+  const [open, setOpen] = useState(false);
+
+  const copy = async (text: string, label: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`${label}已复制`, "ok");
+    } catch {
+      toast("复制失败", "err");
+    }
+  };
+
+  const hhmm = item.time.slice(5, 16); // MM-DD HH:MM
+
+  return (
+    <div className={`ph-item ${open ? "open" : ""}`}>
+      <div className="ph-head" onClick={() => setOpen(!open)} title={open ? "收起" : "展开"}>
+        <span className="ph-arrow">{open ? "▾" : "▸"}</span>
+        <span className="ph-time">{hhmm}</span>
+        {item.model && <span className="ph-model">{item.model}</span>}
+        {item.images.length > 0 && <span className="ph-imgs">🖼×{item.images.length}</span>}
+        <span className="ph-sum">
+          {item.user.replace(/\s+/g, " ").slice(0, 60)}
+          {item.user.length > 60 ? "…" : ""}
+        </span>
+        <span className="ph-out-len">{item.output.length} 字</span>
+      </div>
+
+      {open && (
+        <div className="ph-body">
+          <div className="ph-sec">
+            <div className="ph-sec-h">
+              <span>System Prompt</span>
+              {item.system && (
+                <button className="ph-copy" onClick={() => copy(item.system, "System Prompt ")}>
+                  📋 复制
+                </button>
+              )}
+            </div>
+            <div className="ph-sec-b mono">
+              {item.system || <span className="ph-none">（未使用）</span>}
+            </div>
+          </div>
+
+          <div className="ph-sec">
+            <div className="ph-sec-h">
+              <span>用户提示词</span>
+              {item.images.length > 0 && (
+                <span className="ph-thumbs">
+                  {item.images.map((u, i) => (
+                    <img key={i} src={u} alt={`图${i + 1}`} title={`图 ${i + 1}`} />
+                  ))}
+                </span>
+              )}
+              <button className="ph-copy" onClick={() => copy(item.user, "用户提示词 ")}>
+                📋 复制
+              </button>
+            </div>
+            <div className="ph-sec-b mono">{item.user}</div>
+          </div>
+
+          <div className="ph-sec">
+            <div className="ph-sec-h">
+              <span>生成内容 · T {item.temperature.toFixed(2)}</span>
+              <button className="ph-copy" onClick={() => copy(item.output, "生成内容 ")}>
+                📋 复制
+              </button>
+            </div>
+            <div className="ph-sec-b mono">{item.output}</div>
+          </div>
+
+          <div className="ph-ops">
+            <button
+              className="btn btn-line btn-xs"
+              onClick={() =>
+                useStore.getState().setPromptDraft({
+                  userInput: item.user,
+                  output: item.output,
+                  images: item.images.map((dataUrl, i) => ({ dataUrl, name: `历史图 ${i + 1}` })),
+                })
+              }
+            >
+              ↩ 载入到编辑器
+            </button>
+            <button className="btn btn-line btn-xs" onClick={() => copy(`${item.system ? item.system + "\n\n---\n\n" : ""}【用户】${item.user}\n\n【生成】${item.output}`, "完整记录 ")}>
+              📋 复制全部
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PromptPage() {
-  const { config, toast } = useStore();
-  const [userInput, setUserInput] = useState("");
-  const [templateId, setTemplateId] = useState<string>(""); // 空 = 未选模板
-  const [skillIds, setSkillIds] = useState<string[]>([]);
-  const [manualSystem, setManualSystem] = useState("");
-  const [useManual, setUseManual] = useState(false);
-  const [temperature, setTemperature] = useState(0.7);
-  const [output, setOutput] = useState("");
+  const { config, toast, promptDraft: draft, setPromptDraft, promptHistory, clearPromptHistory } = useStore();
   const [busy, setBusy] = useState(false);
-  // 图片上传：data URL 列表（base64），仅当默认端点勾选「图片理解」时可用
-  const [images, setImages] = useState<{ dataUrl: string; name: string }[]>([]);
+  const [histOpen, setHistOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const endpoints = config?.endpoints ?? [];
@@ -22,14 +111,24 @@ export default function PromptPage() {
   const defaultEp = endpoints.find((e) => e.id === config?.default_endpoint_id) ?? endpoints[0];
   const visionReady = !!defaultEp?.vision;
 
+  const setUserInput = (v: string) => setPromptDraft({ userInput: v });
+  const setTemplateId = (v: string) => setPromptDraft({ templateId: v });
+  const setSkillIds = (fn: (ids: string[]) => string[]) => setPromptDraft({ skillIds: fn(draft.skillIds) });
+  const setManualSystem = (v: string) => setPromptDraft({ manualSystem: v });
+  const setUseManual = (v: boolean) => setPromptDraft({ useManual: v });
+  const setTemperature = (v: number) => setPromptDraft({ temperature: v });
+  const setOutput = (v: string) => setPromptDraft({ output: v });
+  const setImages = (fn: (prev: { dataUrl: string; name: string }[]) => { dataUrl: string; name: string }[]) =>
+    setPromptDraft({ images: fn(draft.images) });
+
   const toggleTemplate = (id: string) =>
-    setTemplateId((cur) => (cur === id ? "" : id)); // 再次点击取消选择
+    setTemplateId(draft.templateId === id ? "" : id); // 再次点击取消选择
 
   // ---- 图片选择与压缩 ----
   const MAX_IMAGES = 4;
   const addImages = async (files: FileList | null) => {
     if (!files || !files.length) return;
-    const room = MAX_IMAGES - images.length;
+    const room = MAX_IMAGES - draft.images.length;
     if (room <= 0) {
       toast(`最多上传 ${MAX_IMAGES} 张图片`, "err");
       return;
@@ -83,15 +182,15 @@ export default function PromptPage() {
   const buildSystemPrompt = (): string => {
     // Skill 块：放在最前，避免被模板/手动指令覆盖弱化
     const skillBlock = skills
-      .filter((s) => skillIds.includes(s.id))
+      .filter((s) => draft.skillIds.includes(s.id))
       .map((s) => `【Skill: ${s.name}】\n${s.content}`)
       .join("\n\n");
 
     let base = "";
-    if (useManual) {
-      base = manualSystem.trim();
+    if (draft.useManual) {
+      base = draft.manualSystem.trim();
     } else {
-      const tpl = templates.find((t) => t.id === templateId);
+      const tpl = templates.find((t) => t.id === draft.templateId);
       base = tpl?.content?.trim() ?? "";
     }
 
@@ -106,7 +205,7 @@ export default function PromptPage() {
       toast("请先在设置中配置 AI 模型 API", "err");
       return;
     }
-    if (!userInput.trim()) {
+    if (!draft.userInput.trim()) {
       toast("请填写提示词内容", "err");
       return;
     }
@@ -115,19 +214,28 @@ export default function PromptPage() {
     setBusy(true);
     setOutput("");
     try {
-      let userContent: ChatMessage["content"] = userInput;
+      let userContent: ChatMessage["content"] = draft.userInput;
       // 有图片时组装 OpenAI 多模态格式：text + image_url（base64 data URL）
-      if (images.length > 0) {
+      if (draft.images.length > 0) {
         userContent = [
-          { type: "text", text: userInput },
-          ...images.map((im) => ({ type: "image_url", image_url: { url: im.dataUrl } })),
+          { type: "text", text: draft.userInput },
+          ...draft.images.map((im) => ({ type: "image_url", image_url: { url: im.dataUrl } })),
         ];
       }
       const messages: ChatMessage[] = [];
       if (sys.trim()) messages.push({ role: "system", content: sys });
       messages.push({ role: "user", content: userContent });
-      const result = await api.chatCompletion(defaultEp, messages, temperature);
+      const result = await api.chatCompletion(defaultEp, messages, draft.temperature);
       setOutput(result);
+      // 成功后写入历史快照（含 system / user / 图片 / 输出）
+      useStore.getState().addPromptHistory({
+        system: sys,
+        user: draft.userInput,
+        images: draft.images.map((im) => im.dataUrl),
+        output: result,
+        temperature: draft.temperature,
+        model: defaultEp.name,
+      });
       toast("生成完成", "ok");
     } catch (e) {
       toast(`生成失败: ${e}`, "err");
@@ -137,14 +245,16 @@ export default function PromptPage() {
   };
 
   const copyOut = async () => {
-    if (!output) return;
+    if (!draft.output) return;
     try {
-      await navigator.clipboard.writeText(output);
+      await navigator.clipboard.writeText(draft.output);
       toast("已复制到剪贴板", "ok");
     } catch {
       toast("复制失败", "err");
     }
   };
+
+  const { userInput, templateId, skillIds, manualSystem, useManual, temperature, output, images } = draft;
 
   return (
     <div>
@@ -153,7 +263,7 @@ export default function PromptPage() {
           <h1>提示词助手</h1>
           <div className="desc">
             填写需求即可直接生成；也可选择 Skill 与 System Prompt 模板让 AI
-            按特定风格润色成 ComfyUI / 视频生成提示词。
+            按特定风格润色成 ComfyUI / 视频生成提示词。切换页面不会丢失当前内容。
           </div>
         </div>
       </div>
@@ -328,6 +438,40 @@ export default function PromptPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ---- 提示词历史（默认收拢，点击展开） ---- */}
+      <div className="ph-panel">
+        <div className="ph-panel-h" onClick={() => setHistOpen(!histOpen)} title={histOpen ? "收起历史" : "展开历史"}>
+          <span className="ph-arrow">{histOpen ? "▾" : "▸"}</span>
+          <span className="ph-title">⏱ 提示词历史</span>
+          <span className="h-meta">{promptHistory.length} 条</span>
+          <span style={{ flex: 1 }} />
+          <button
+            className="ph-clear"
+            title="清空全部历史"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (promptHistory.length === 0) return;
+              if (confirm(`确定清空全部 ${promptHistory.length} 条提示词历史？此操作不可恢复。`)) {
+                clearPromptHistory();
+                toast("历史已清空", "ok");
+              }
+            }}
+          >
+            🗑 清空
+          </button>
+        </div>
+        {histOpen && (
+          <div className="ph-list">
+            {promptHistory.length === 0 && (
+              <div className="ph-empty">暂无历史记录 —— 每次成功生成后，系统提示词、用户提示词与生成内容会自动保存在这里。</div>
+            )}
+            {promptHistory.map((item) => (
+              <HistoryItem key={item.id} item={item} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
