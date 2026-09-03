@@ -136,11 +136,11 @@ export default function LogsPage() {
           )}
           {filtered.map((i) => (
             <div key={i.id} className={`log-line lv-${i.level.toLowerCase()}`}>
-              <span className="t">{i.time.slice(11)}</span>
+              <span className="t">{i.time.slice(11, 23)}</span>
               <span className="lv" style={{ color: LV[i.level] ?? "var(--tx-2)" }}>
                 {i.level}
               </span>
-              <span className="tg">{i.target}</span>
+              <span className="tg" title={i.target}>{i.target}</span>
               <span className="msg">{i.msg}</span>
             </div>
           ))}
