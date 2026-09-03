@@ -73,7 +73,7 @@ function HistoryItem({ item }: { item: PromptHistoryEntry }) {
                 📋 复制
               </button>
             </div>
-            <div className="ph-sec-b mono">{item.output}</div>
+            <div className="ph-sec-b mono out">{item.output}</div>
           </div>
 
           <div className="ph-ops">
