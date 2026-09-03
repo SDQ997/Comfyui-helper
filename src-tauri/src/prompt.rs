@@ -4,9 +4,18 @@ use crate::config::ApiEndpoint;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    /// 纯文本
+    Text(String),
+    /// OpenAI 多模态数组格式：[{type:"text",...},{type:"image_url",...}]
+    Parts(Vec<serde_json::Value>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
-    pub content: String,
+    pub content: MessageContent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

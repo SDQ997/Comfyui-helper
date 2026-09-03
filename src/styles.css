@@ -609,6 +609,33 @@ label { vertical-align: middle; }
   color: var(--tx-1); z-index: 4; backdrop-filter: blur(4px);
 }
 .meta-kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 11.5px; }
+
+/* 提示词助手：图片上传区 */
+.img-upload {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+  padding: 8px; border: 1px dashed var(--line-2); border-radius: var(--r-5);
+  background: var(--bg-2);
+}
+.img-thumb {
+  position: relative; width: 64px; height: 64px; border-radius: var(--r-5);
+  overflow: hidden; border: 1px solid var(--line-2); flex: none;
+}
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-thumb .img-x {
+  position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
+  border: none; border-radius: 50%; background: rgba(0, 0, 0, 0.65); color: #fff;
+  font-size: 11px; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; padding: 0;
+}
+.img-thumb .img-x:hover { background: #e81123; }
+.img-add {
+  width: 64px; height: 64px; border: 1px dashed var(--line-2); border-radius: var(--r-5);
+  background: transparent; color: var(--tx-3); cursor: pointer; flex: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; font-size: 16px; transition: all var(--t-fast);
+}
+.img-add span { font-size: 10px; }
+.img-add:hover { border-color: var(--c-cyan); color: var(--c-cyan); background: var(--c-cyan-soft); }
 .meta-kv .k { color: var(--tx-3); }
 .meta-kv .v { color: var(--tx-1); font-family: var(--f-mono); font-size: 11px; user-select: text; word-break: break-all; }
 

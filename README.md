@@ -8,7 +8,7 @@
 
 | 模块 | 说明 |
 |---|---|
-| ✦ 提示词助手 | OpenAI 兼容 API 润色提示词；System Prompt 模板（可取消选择）+ Skill 可插拔，Skill 始终置前不被模板覆盖，支持手动填写 |
+| ✦ 提示词助手 | OpenAI 兼容 API 润色提示词；System Prompt 模板（可取消选择）+ Skill 可插拔，Skill 始终置前不被模板覆盖；勾选「图片理解」的模型可上传图片（≤4 张，自动压缩）让 AI 分析 |
 | ▦ 资产管理 | 多目录聚合扫描视频/图片/文本/音频，网格浏览、缩略图后台静默生成、模糊隐藏（工具栏一键全部隐藏 ⇄ 全部显示切换）、预览 |
 | ✓ LoRA 管理 | 多目录扫描 .safetensors；触发词编辑即时写回同目录同名 .txt（顿号分隔）；删除进回收站（二次确认） |
 | ⚙ 插件管理 | 扫描 custom_nodes 的 git 仓库，可视化 ahead/behind 状态，批量 fast-forward 更新，操作日志；删除进回收站（二次确认） |
@@ -72,6 +72,10 @@ run-debug.bat gpudbg :: 保留 GPU
 Tauri 2 · React 18 · TypeScript · Zustand · git2-rs · reqwest。详见 `src-tauri/Cargo.toml`。
 
 ## 更新日志
+
+### v0.2.2（2026-09-03）
+
+- **模型图片理解能力**：设置 → 模型 API 中可为每个端点勾选「🖼 图片理解」；勾选后提示词助手出现图片上传区（点击选择或拖拽，最多 4 张，长边超 1280px 自动压缩为 JPEG），图片以 OpenAI 多模态格式（base64 data URL）随消息发送给 AI 分析
 
 ### v0.2.1（2026-09-02）
 

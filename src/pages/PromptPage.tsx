@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useStore } from "../store";
 import { api, ChatMessage } from "../api";
 
@@ -12,14 +12,73 @@ export default function PromptPage() {
   const [temperature, setTemperature] = useState(0.7);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
+  // 图片上传：data URL 列表（base64），仅当默认端点勾选「图片理解」时可用
+  const [images, setImages] = useState<{ dataUrl: string; name: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const endpoints = config?.endpoints ?? [];
   const templates = config?.templates ?? [];
   const skills = config?.skills ?? [];
   const defaultEp = endpoints.find((e) => e.id === config?.default_endpoint_id) ?? endpoints[0];
+  const visionReady = !!defaultEp?.vision;
 
   const toggleTemplate = (id: string) =>
     setTemplateId((cur) => (cur === id ? "" : id)); // 再次点击取消选择
+
+  // ---- 图片选择与压缩 ----
+  const MAX_IMAGES = 4;
+  const addImages = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const room = MAX_IMAGES - images.length;
+    if (room <= 0) {
+      toast(`最多上传 ${MAX_IMAGES} 张图片`, "err");
+      return;
+    }
+    const picked = Array.from(files).slice(0, room);
+    for (const f of picked) {
+      if (!f.type.startsWith("image/")) {
+        toast(`跳过非图片文件: ${f.name}`, "err");
+        continue;
+      }
+      try {
+        const dataUrl = await compressImage(f, 1280);
+        setImages((prev) => [...prev, { dataUrl, name: f.name }]);
+      } catch (e) {
+        toast(`读取图片失败: ${f.name} (${e})`, "err");
+      }
+    }
+  };
+
+  /** 读取图片并等比缩放转 data URL（长边超过 maxSide 则压缩，控制 base64 体积） */
+  const compressImage = (file: File, maxSide: number): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("读文件失败"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("解码失败"));
+        img.onload = () => {
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          // 无需缩放且体积 < 1.5MB 时直接用原始 data URL（保持 PNG 透明度等）
+          if (scale >= 1 && file.size < 1.5 * 1024 * 1024) {
+            resolve(reader.result as string);
+            return;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("canvas 不可用"));
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.9));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
 
   const buildSystemPrompt = (): string => {
     // Skill 块：放在最前，避免被模板/手动指令覆盖弱化
@@ -59,9 +118,17 @@ export default function PromptPage() {
     setBusy(true);
     setOutput("");
     try {
+      let userContent: ChatMessage["content"] = userInput;
+      // 有图片时组装 OpenAI 多模态格式：text + image_url（base64 data URL）
+      if (images.length > 0) {
+        userContent = [
+          { type: "text", text: userInput },
+          ...images.map((im) => ({ type: "image_url", image_url: { url: im.dataUrl } })),
+        ];
+      }
       const messages: ChatMessage[] = [
         { role: "system", content: sys },
-        { role: "user", content: userInput },
+        { role: "user", content: userContent },
       ];
       const result = await api.chatCompletion(defaultEp, messages, temperature);
       setOutput(result);
@@ -175,6 +242,53 @@ export default function PromptPage() {
               <i className="dot" />用户输入
               <span className="h-meta">{userInput.length} 字</span>
             </h3>
+            {visionReady ? (
+              <div
+                className="img-upload"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  void addImages(e.dataTransfer.files);
+                }}
+              >
+                {images.map((im, idx) => (
+                  <div key={idx} className="img-thumb">
+                    <img src={im.dataUrl} alt={im.name} title={im.name} />
+                    <button
+                      className="img-x"
+                      title="移除图片"
+                      onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {images.length < MAX_IMAGES && (
+                  <button
+                    className="img-add"
+                    title={`上传图片（最多 ${MAX_IMAGES} 张，可直接拖入）`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    ＋<span>图片</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    void addImages(e.target.files);
+                    e.target.value = ""; // 允许重复选择同一文件
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="hint" style={{ marginBottom: 6 }}>
+                💡 在「设置 → 模型 API」中为当前模型勾选「🖼 图片理解」后，可在此上传图片让 AI 分析参考。
+              </div>
+            )}
             <textarea
               className="txa"
               rows={8}
@@ -214,7 +328,7 @@ export default function PromptPage() {
               📋 复制
             </button>
             <button className="btn btn-primary" onClick={generate} disabled={busy}>
-              {busy ? "生成中…" : "✦ 生成提示词"}
+              {busy ? "生成中…" : images.length > 0 ? `✦ 生成提示词（含 ${images.length} 图）` : "✦ 生成提示词"}
             </button>
           </div>
         </div>

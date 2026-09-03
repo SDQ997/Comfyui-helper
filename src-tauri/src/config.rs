@@ -17,6 +17,8 @@ pub struct ApiEndpoint {
     pub api_key: String,
     pub model: String,
     pub timeout_secs: u64,
+    /// 是否具备图片理解能力（勾选后提示词助手可上传图片给 AI 分析）
+    pub vision: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

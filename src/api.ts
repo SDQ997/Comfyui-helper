@@ -47,6 +47,8 @@ export interface ApiEndpoint {
   api_key: string;
   model: string;
   timeout_secs: number;
+  /** 是否具备图片理解能力（勾选后提示词助手可上传图片） */
+  vision?: boolean;
 }
 
 export interface PromptTemplate { id: string; name: string; content: string; }
@@ -85,7 +87,11 @@ export interface VideoMeta {
   audio_codec: string | null; audio_sample_rate: number | null; audio_channels: number | null;
   frame_count: number | null; raw: unknown;
 }
-export interface ChatMessage { role: string; content: string; }
+export interface ChatMessage {
+  role: string;
+  /** 纯文本，或多模态 parts 数组（OpenAI 格式：{type:"text"} / {type:"image_url"}） */
+  content: string | Record<string, unknown>[];
+}
 export interface LogItem {
   id: number; time: string; level: string; target: string; msg: string;
 }
