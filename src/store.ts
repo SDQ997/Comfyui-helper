@@ -27,8 +27,49 @@ export interface PromptDraft {
   images: { dataUrl: string; name: string }[];
 }
 
+/** MiniMax 助手资源引用（图片/视频/音频） */
+export interface H3Asset {
+  id: string;
+  kind: "image" | "video" | "audio";
+  name: string;
+  /** 图片：压缩后 data URL；视频/音频：本地路径（仅作为标识与缩略线索，不发给 AI） */
+  dataUrl: string;
+  /** 图片发给 AI 用 data URL；视频/音频发文件名占位 */
+  size: number;
+}
+
+/** MiniMax 助手历史条目 */
+export interface H3HistoryEntry {
+  id: number;
+  time: string;
+  systemMode: string;   // base / ref（记录当次使用的指南）
+  user: string;         // 已拼参数前缀的最终 user prompt
+  assets: { kind: "image" | "video" | "audio"; name: string }[];
+  output: string;
+  temperature: number;
+  model?: string;
+  ratio: string;
+  duration: number;
+}
+
+/** MiniMax 助手草稿 */
+export interface H3Draft {
+  text: string;
+  /** 富文本片段：文本 / 资源引用混排 */
+  parts: ({ type: "text"; text: string } | { type: "ref"; assetId: string })[];
+  images: H3Asset[];
+  videos: H3Asset[];
+  audios: H3Asset[];
+  ratio: string;
+  duration: number;
+  temperature: number;
+  output: string;
+}
+
 const LS_KEY = "comfyui_helper_prompt_history_v1";
 const MAX_HISTORY = 50;
+const H3_LS_KEY = "comfyui_helper_h3_history_v1";
+const H3_MAX_HISTORY = 50;
 
 function loadHistory(): PromptHistoryEntry[] {
   try {
@@ -55,6 +96,29 @@ function saveHistory(list: PromptHistoryEntry[]) {
   }
 }
 
+function loadH3History(): H3HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(H3_LS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveH3History(list: H3HistoryEntry[]) {
+  try {
+    localStorage.setItem(H3_LS_KEY, JSON.stringify(list));
+  } catch {
+    try {
+      localStorage.setItem(H3_LS_KEY, JSON.stringify(list.slice(0, 20)));
+    } catch {
+      /* 忽略 */
+    }
+  }
+}
+
 interface Store {
   config: AppConfig | null;
   page: string;
@@ -68,6 +132,13 @@ interface Store {
   promptHistory: PromptHistoryEntry[];
   addPromptHistory: (entry: Omit<PromptHistoryEntry, "id" | "time">) => void;
   clearPromptHistory: () => void;
+
+  // MiniMax 助手：草稿 + 历史
+  h3Draft: H3Draft;
+  setH3Draft: (patch: Partial<H3Draft>) => void;
+  h3History: H3HistoryEntry[];
+  addH3History: (entry: Omit<H3HistoryEntry, "id" | "time">) => void;
+  clearH3History: () => void;
 
   setPage: (p: string) => void;
   loadConfig: () => Promise<void>;
@@ -113,6 +184,36 @@ export const useStore = create<Store>((set, get) => ({
   clearPromptHistory: () => {
     saveHistory([]);
     set({ promptHistory: [] });
+  },
+
+  h3Draft: {
+    text: "",
+    parts: [{ type: "text", text: "" }],
+    images: [],
+    videos: [],
+    audios: [],
+    ratio: "16:9",
+    duration: 15,
+    temperature: 0.7,
+    output: "",
+  },
+  setH3Draft: (patch) => set((s) => ({ h3Draft: { ...s.h3Draft, ...patch } })),
+
+  h3History: loadH3History(),
+  addH3History: (entry) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const time = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const item: H3HistoryEntry = { ...entry, id: ++histId, time };
+    set((s) => {
+      const list = [item, ...s.h3History].slice(0, H3_MAX_HISTORY);
+      saveH3History(list);
+      return { h3History: list };
+    });
+  },
+  clearH3History: () => {
+    saveH3History([]);
+    set({ h3History: [] });
   },
 
   loadConfig: async () => {

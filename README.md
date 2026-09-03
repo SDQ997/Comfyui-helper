@@ -9,6 +9,7 @@
 | 模块 | 说明 |
 |---|---|
 | ✦ 提示词助手 | OpenAI 兼容 API 润色提示词，直接填写需求即可生成；System Prompt 模板与 Skill 均为可选增强（可取消选择），Skill 始终置前；勾选「图片理解」的模型可上传图片（≤4 张，自动压缩）让 AI 分析；草稿跨页面保留，历史生成记录（系统 / 用户提示词 / 生成内容）自动快照、可展开复制 |
+| ◈ MiniMax 助手 | 专为 MiniMax H3 视频提示词打造：内置 h3-prompt-writing skill 作为固定 system prompt（按有无参考资源自动切换 Base / Full-Reference 指南）；支持 9 图 / 3 视频 / 3 音频（视频音频仅传引用不传内容）；输入 @ 弹出资源选择浮层（鼠标 / 方向键 + Enter），图片以迷你缩略 chip 内嵌提示词，视频 / 音频以「视频1」「音频1」chip 展示；可选 8 种比例（1:1~21:9）与时长（默认 15s），参数自动拼在 prompt 开头提交；历史记录 localStorage 持久化 |
 | ▦ 资产管理 | 多目录聚合扫描视频/图片/文本/音频，网格浏览、缩略图后台静默生成、模糊隐藏（工具栏一键全部隐藏 ⇄ 全部显示切换）、预览 |
 | ✓ LoRA 管理 | 多目录扫描 .safetensors；触发词编辑即时写回同目录同名 .txt（顿号分隔）；删除进回收站（二次确认） |
 | ⚙ 插件管理 | 扫描 custom_nodes 的 git 仓库，可视化 ahead/behind 状态，批量 fast-forward 更新，操作日志；删除进回收站（二次确认） |
@@ -72,6 +73,15 @@ run-debug.bat gpudbg :: 保留 GPU
 Tauri 2 · React 18 · TypeScript · Zustand · git2-rs · reqwest。详见 `src-tauri/Cargo.toml`。
 
 ## 更新日志
+
+### v0.3.0（2026-09-03）
+
+- **新模块「MiniMax 助手」**：专用 MiniMax H3 视频提示词生成页（侧栏「◈ MiniMax 助手」）
+  - 内置 h3-prompt-writing skill（SKILL.md + base-en + ref-en 随软件打包，`?raw` 导入），作为固定 system prompt，无需配置；有参考资源时自动追加 Full-Reference 指南（Ref2VA 六段结构），纯文本时追加 Base 指南（T2VA / I2VA / FL2VA / L2VA）
+  - 资源输入：图片 ≤9（压缩为 base64 随消息发送）、视频 ≤3、音频 ≤3（视频 / 音频仅传编号引用，不上传内容）
+  - `@` 引用：提示词输入 @ 弹出资源浮层，↑↓ 选择、Enter / Tab 确认、Esc 关闭、鼠标点选；图片 chip 内嵌迷你圆缩略，视频 / 音频 chip 显示「视频N」「音频N」（黄 / 蓝配色区分）
+  - 参数栏：8 种比例（1:1 / 2:3 / 3:2 / 3:4 / 4:3 / 16:9 / 9:16 / 21:9）+ 时长手填（4~20s，默认 15）+ Temperature；提交时自动拼前缀（如 `16:9,15s,一个男人走在雨夜中…`），面板实时显示格式预览
+  - 草稿跨页面保留；生成历史（参数 / 资源数 / 输出）localStorage 持久化（上限 50 条），可折叠展开、一键清空
 
 ### v0.2.3（2026-09-03）
 

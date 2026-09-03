@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useStore } from "./store";
 import { applyTheme } from "./theme";
 import PromptPage from "./pages/PromptPage";
+import H3Page from "./pages/H3Page";
 import AssetsPage from "./pages/AssetsPage";
 import LoraPage from "./pages/LoraPage";
 import PluginsPage from "./pages/PluginsPage";
@@ -12,6 +13,7 @@ import DonatePage from "./pages/DonatePage";
 
 const NAV: { key: string; ico: string; label: string }[] = [
   { key: "prompt", ico: "✦", label: "提示词助手" },
+  { key: "h3", ico: "◈", label: "MiniMax 助手" },
   { key: "assets", ico: "▦", label: "资产管理" },
   { key: "lora", ico: "✓", label: "LoRA 管理" },
   { key: "plugins", ico: "⚙", label: "插件管理" },
@@ -155,6 +157,7 @@ export default function App() {
       <main className="main">
         <div className="content">
           {page === "prompt" && <PromptPage />}
+          {page === "h3" && <H3Page />}
           {page === "assets" && <AssetsPage />}
           {page === "lora" && <LoraPage />}
           {page === "plugins" && <PluginsPage />}
