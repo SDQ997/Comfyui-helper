@@ -882,7 +882,7 @@ label { vertical-align: middle; }
   transition: border-color var(--t-fast);
 }
 .h3-asset-item:hover { border-color: var(--line-3); }
-.h3-asset-item img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.h3-asset-item img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--bg-4); }
 .h3-asset-name {
   position: relative; z-index: 1; font-size: 10px; color: var(--tx-1);
   background: rgba(0, 0, 0, 0.55); border-radius: var(--r-4); padding: 1px 6px;

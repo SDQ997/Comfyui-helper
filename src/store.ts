@@ -42,6 +42,7 @@ export interface H3Asset {
 export interface H3HistoryEntry {
   id: number;
   time: string;
+  mode: string;         // T2V / I2V / FL2V / R2V
   systemMode: string;   // base / ref（记录当次使用的指南）
   user: string;         // 已拼参数前缀的最终 user prompt
   assets: { kind: "image" | "video" | "audio"; name: string }[];
@@ -52,8 +53,11 @@ export interface H3HistoryEntry {
   duration: number;
 }
 
+export type H3Mode = "T2V" | "I2V" | "FL2V" | "R2V";
+
 /** MiniMax 助手草稿 */
 export interface H3Draft {
+  mode: H3Mode;
   text: string;
   /** 富文本片段：文本 / 资源引用混排 */
   parts: ({ type: "text"; text: string } | { type: "ref"; assetId: string })[];
@@ -187,6 +191,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   h3Draft: {
+    mode: "T2V",
     text: "",
     parts: [{ type: "text", text: "" }],
     images: [],

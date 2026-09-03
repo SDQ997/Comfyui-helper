@@ -23,7 +23,11 @@ ${refEn.trim()}`
 ${baseEn.trim()}`;
 }
 
-/** 用户 prompt 开头的参数前缀，如 "16:9,15s," */
-export function h3ParamPrefix(ratio: string, durationSec: number): string {
-  return `${ratio},${Math.round(durationSec)}s,`;
+/** 用户 prompt 开头的参数前缀：mode,ratio,Ns[,图片1为首帧，图片2为尾帧], */
+export function h3ParamPrefix(mode: string, ratio: string, durationSec: number): string {
+  const base = `${mode},${ratio},${Math.round(durationSec)}s,`;
+  if (mode === "FL2V") {
+    return `${base}图片1为首帧，图片2为尾帧,`;
+  }
+  return base;
 }
