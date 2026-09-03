@@ -38,6 +38,10 @@ export default function H3Page() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerItems, setPickerItems] = useState<PickerItem[]>([]);
   const [pickerActive, setPickerActive] = useState(0);
+  // @ 触发点：{文本段下标, @ 前的光标偏移}
+  const atTriggerRef = useRef<{ partIdx: number; textOffset: number } | null>(null);
+  // 插入 chip 后希望聚焦的文本段下标（渲染后由 effect 消费）
+  const caretHintRef = useRef<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputTabRef = useRef<AssetTab>("image");
@@ -196,28 +200,44 @@ export default function H3Page() {
   };
 
   /**
-   * 在「触发 @ 的那个文本段之后」插入引用 chip：
-   * - 移除该文本段末尾的 @ 字符
-   * - chip 位置 = 该文本段的紧后（而非整个 parts 末尾，避免“跑到最右边”）
+   * 在「触发 @ 的光标位置」插入引用 chip：
+   * - 记录触发浮层时的 {文本段下标, @ 前光标偏移}
+   * - 插入时以 @ 所在偏移为界，把该文本段切成前/后两段，chip 落在中间
+   * - 若无记录（异常路径）退化为段末插入
    */
   const insertRefAfterText = (r: AssetRef) => {
     const parts = [...draft.parts];
-    // 找最后一个以 @ 结尾的文本段（即刚触发 @ 的位置）
-    let anchor = -1;
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const p = parts[i];
-      if (p.type === "text" && p.text.endsWith("@")) { anchor = i; break; }
-    }
-    if (anchor >= 0) {
-      const tp = parts[anchor] as { type: "text"; text: string };
-      parts[anchor] = { type: "text", text: tp.text.slice(0, -1) }; // 去掉 @
-      parts.splice(anchor + 1, 0, { type: "ref", assetId: JSON.stringify(r) });
+    const a = atTriggerRef.current;
+    atTriggerRef.current = null;
+    let inserted = false;
+    if (a && parts[a.partIdx]?.type === "text") {
+      const tp = parts[a.partIdx] as { type: "text"; text: string };
+      const cut = a.textOffset; // @ 字符所在偏移（@ 即被丢弃）
+      const before = tp.text.slice(0, cut);
+      const after = tp.text.slice(cut + 1); // 跳过 @
+      const replacement: H3Draft["parts"] = [
+        { type: "text", text: before },
+        { type: "ref", assetId: JSON.stringify(r) },
+        { type: "text", text: after },
+      ];
+      parts.splice(a.partIdx, 1, ...replacement);
+      inserted = true;
+      // 光标回到 chip 后的文本段开头
+      caretHintRef.current = a.partIdx + 2;
     } else {
       parts.push({ type: "ref", assetId: JSON.stringify(r) });
+      caretHintRef.current = parts.length; // 追加的新文本段
+      parts.push({ type: "text", text: "" });
     }
-    // chip 后补一个空文本段，方便继续输入
-    parts.push({ type: "text", text: "" });
+    if (!inserted) {
+      // 上面 push 了 ref 与空文本段，无需再处理
+    }
     setH3Draft({ parts });
+  };
+
+  /** chip 上的 × 移除引用（按 assetId 匹配） */
+  const removeRefPart = (assetId: string) => {
+    setH3Draft({ parts: draft.parts.filter((p) => !(p.type === "ref" && p.assetId === assetId)) });
   };
 
   /* ---------- parts 工具 ---------- */
@@ -459,6 +479,14 @@ export default function H3Page() {
               return (
                 <textarea
                   key={i}
+                  ref={(el) => {
+                    // 渲染后把光标放回 chip 后的文本段
+                    if (caretHintRef.current === i && el) {
+                      caretHintRef.current = null;
+                      el.focus();
+                      el.setSelectionRange(0, 0);
+                    }
+                  }}
                   className="h3-editable"
                   rows={Math.max(1, Math.ceil((p.text.length || 1) / 60))}
                   value={p.text}
@@ -467,8 +495,11 @@ export default function H3Page() {
                     const parts = [...draft.parts];
                     parts[i] = { type: "text", text: e.target.value };
                     setH3Draft({ parts });
-                    // 检测 @ 触发
-                    if (e.target.value.endsWith("@")) openPicker();
+                    // 检测 @ 触发：记录文本段下标与光标位置（@ 所在偏移）
+                    if (e.target.value.endsWith("@")) {
+                      atTriggerRef.current = { partIdx: i, textOffset: e.target.selectionStart - 1 };
+                      openPicker();
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (pickerOpen) {
@@ -486,7 +517,7 @@ export default function H3Page() {
               const r = JSON.parse(p.assetId) as AssetRef;
               return (
                 <span key={i} className="h3-chip-wrap">
-                  <AssetChip ref_={r} />
+                  <AssetChip ref_={r} onRemove={() => removeRefPart(p.assetId)} />
                 </span>
               );
             } catch { return null; }
