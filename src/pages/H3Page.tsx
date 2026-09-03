@@ -259,7 +259,12 @@ export default function H3Page() {
       return;
     }
     const hasRef = draft.mode !== "T2V";
-    const sys = buildH3System(hasRef);
+    const sys = buildH3System(draft.mode, {
+      images: draft.images.length,
+      videos: draft.videos.length,
+      audios: draft.audios.length,
+      duration: draft.duration,
+    });
     const userPrompt = partsToUserPrompt();
     setBusy(true);
     setH3Draft({ output: "" });
