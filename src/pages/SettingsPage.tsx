@@ -297,59 +297,85 @@ export default function SettingsPage() {
                 兼容 OpenAI Chat Completions 格式。支持 OpenAI / DeepSeek / 智谱 / Ollama / 自定义网关。改完记得保存。
                 勾选「图片理解」的模型可在提示词助手中上传图片进行分析。
               </div>
-              {cfg.endpoints.map((e, idx) => (
-                <div key={e.id} className="ep-card">
-                  <div className="ep-head">
-                    <span className="ep-idx">#{idx + 1}</span>
-                    <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
-                      <input type="radio" checked={cfg.default_endpoint_id === e.id} onChange={() => setDefault(e.id)} />
-                      默认
-                    </label>
-                    <label
-                      style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginLeft: 12 }}
-                      title="勾选后，提示词助手可上传图片让该模型分析（需模型本身支持视觉能力，如 gpt-4o / qwen-vl 等）"
-                    >
+              {cfg.endpoints.map((e, idx) => {
+                const isDefault = cfg.default_endpoint_id === e.id;
+                return (
+                  <div key={e.id} className={`ep-card ${isDefault ? "default" : ""}`}>
+                    <div className="ep-head">
+                      <span className="ep-idx">#{idx + 1}</span>
                       <input
-                        type="checkbox"
-                        checked={!!e.vision}
-                        onChange={(ev) => patchEndpoint(e.id, { vision: ev.target.checked })}
+                        className="ep-name"
+                        value={e.name}
+                        onChange={(ev) => patchEndpoint(e.id, { name: ev.target.value })}
+                        placeholder="端点名称"
                       />
-                      🖼 图片理解
-                    </label>
+                      {isDefault ? (
+                        <span className="ep-def" title="提示词助手等功能的默认模型">默认</span>
+                      ) : (
+                        <button
+                          className="ep-setdef"
+                          title="设为默认端点"
+                          onClick={() => setDefault(e.id)}
+                        >
+                          设为默认
+                        </button>
+                      )}
+                      <label
+                        className={`ep-vision ${e.vision ? "on" : ""}`}
+                        title="勾选后，提示词助手可上传图片让该模型分析（需模型本身支持视觉能力，如 gpt-4o / qwen-vl 等）"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!e.vision}
+                          onChange={(ev) => patchEndpoint(e.id, { vision: ev.target.checked })}
+                        />
+                        🖼 图片理解
+                      </label>
+                    </div>
+                    <div className="ep-fields">
+                      <div className="ep-f">
+                        <label>类型</label>
+                        <select className="sel" value={e.kind} onChange={(ev) => patchEndpoint(e.id, { kind: ev.target.value })}>
+                          <option value="openai">OpenAI 兼容</option>
+                          <option value="anthropic">Anthropic</option>
+                          <option value="ollama">Ollama</option>
+                        </select>
+                      </div>
+                      <div className="ep-f">
+                        <label>Base URL</label>
+                        <div className="input">
+                          <span className="ico">🔗</span>
+                          <input value={e.base_url} onChange={(ev) => patchEndpoint(e.id, { base_url: ev.target.value })} placeholder="https://api.openai.com/v1" />
+                        </div>
+                      </div>
+                      <div className="ep-f">
+                        <label>API Key</label>
+                        <div className="input">
+                          <span className="ico">🔑</span>
+                          <input type="password" value={e.api_key} onChange={(ev) => patchEndpoint(e.id, { api_key: ev.target.value })} placeholder="sk-..." />
+                        </div>
+                      </div>
+                      <div className="ep-f">
+                        <label>模型</label>
+                        <div className="input">
+                          <input value={e.model} onChange={(ev) => patchEndpoint(e.id, { model: ev.target.value })} placeholder="模型名，如 qwen3.7-flash" />
+                        </div>
+                      </div>
+                      <div className="ep-f ep-f-sm">
+                        <label>超时(秒)</label>
+                        <div className="input">
+                          <input type="number" min={5} max={600} value={e.timeout_secs}
+                            onChange={(ev) => patchEndpoint(e.id, { timeout_secs: Number(ev.target.value) || 60 })} />
+                        </div>
+                      </div>
+                      <div className="ep-del-wrap">
+                        <button className="btn btn-danger btn-sm" onClick={() => removeEndpoint(e.id)}>删除</button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="v">
-                    <div className="set-row">
-                      <div className="input" style={{ width: 150 }}>
-                        <input value={e.name} onChange={(ev) => patchEndpoint(e.id, { name: ev.target.value })} placeholder="名称" />
-                      </div>
-                      <select className="sel" value={e.kind} onChange={(ev) => patchEndpoint(e.id, { kind: ev.target.value })} style={{ width: 130 }}>
-                        <option value="openai">OpenAI 兼容</option>
-                        <option value="anthropic">Anthropic</option>
-                        <option value="ollama">Ollama</option>
-                      </select>
-                      <button className="btn btn-danger btn-sm" onClick={() => removeEndpoint(e.id)}>删除</button>
-                    </div>
-                    <div className="input">
-                      <span className="ico">🔗</span>
-                      <input value={e.base_url} onChange={(ev) => patchEndpoint(e.id, { base_url: ev.target.value })} placeholder="https://api.openai.com/v1" />
-                    </div>
-                    <div className="set-row">
-                      <div className="input" style={{ flex: 1 }}>
-                        <span className="ico">🔑</span>
-                        <input type="password" value={e.api_key} onChange={(ev) => patchEndpoint(e.id, { api_key: ev.target.value })} placeholder="sk-..." />
-                      </div>
-                      <div className="input" style={{ width: 180 }}>
-                        <input value={e.model} onChange={(ev) => patchEndpoint(e.id, { model: ev.target.value })} placeholder="模型名" />
-                      </div>
-                      <div className="input" style={{ width: 110 }}>
-                        <input type="number" min={5} max={600} value={e.timeout_secs}
-                          onChange={(ev) => patchEndpoint(e.id, { timeout_secs: Number(ev.target.value) || 60 })} title="超时（秒）" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <button className="btn btn-line btn-sm" onClick={addEndpoint} style={{ marginTop: 8 }}>
+                );
+              })}
+              <button className="btn btn-line btn-sm" onClick={addEndpoint} style={{ marginTop: 10 }}>
                 ＋ 添加 API 端点
               </button>
             </div>

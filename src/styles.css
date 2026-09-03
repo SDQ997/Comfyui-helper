@@ -476,19 +476,58 @@ label { vertical-align: middle; }
 .set-field .lbl { font-size: 12.5px; color: var(--tx-2); padding-top: 7px; }
 .set-field .lbl .sub { font-size: 10.5px; color: var(--tx-4); margin-top: 3px; }
 .set-field .v { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-/* 模型 API 端点卡片：多端点之间明确分隔 */
+/* 模型 API 端点卡片：头部（编号+名称+默认徽标+图片理解）+ 字段网格 */
 .ep-card {
-  display: flex; gap: 14px; align-items: flex-start;
   border: 1px solid var(--line-1); border-radius: var(--r-7);
-  padding: 12px 14px; margin-bottom: 14px; background: var(--bg-2);
-  transition: border-color var(--t-fast);
+  padding: 12px 14px 14px; margin-bottom: 12px; background: var(--bg-2);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .ep-card:hover { border-color: var(--line-2); }
-.ep-head {
-  display: flex; flex-direction: column; gap: 8px; flex: none;
-  font-size: 12px; color: var(--tx-2); min-width: 64px;
+.ep-card.default {
+  border-color: var(--c-cyan-line);
+  background: linear-gradient(180deg, var(--c-cyan-soft), transparent 56px), var(--bg-2);
 }
-.ep-idx { font-family: var(--f-mono); font-size: 11px; color: var(--tx-4); }
+.ep-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-bottom: 10px; margin-bottom: 12px;
+  border-bottom: 1px dashed var(--line-1);
+}
+.ep-idx { font-family: var(--f-mono); font-size: 11px; color: var(--tx-4); flex: none; }
+.ep-name {
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-5);
+  color: var(--tx-1); font-size: 13.5px; font-weight: 600; padding: 3px 8px;
+  min-width: 0; width: 180px; outline: none; transition: all var(--t-fast);
+}
+.ep-name:hover { border-color: var(--line-1); background: var(--bg-3); }
+.ep-name:focus { border-color: var(--c-cyan-line); background: var(--bg-3); }
+.ep-name::placeholder { font-weight: 400; color: var(--tx-4); }
+.ep-def {
+  flex: none; font-size: 10px; font-weight: 600; color: var(--on-accent);
+  background: var(--c-cyan); border-radius: var(--r-pill); padding: 2px 9px;
+  box-shadow: 0 0 8px var(--c-cyan-glow); letter-spacing: 0.5px;
+}
+.ep-setdef {
+  flex: none; font-size: 10px; color: var(--tx-4); background: none;
+  border: 1px dashed var(--line-2); border-radius: var(--r-pill); padding: 2px 9px;
+  cursor: pointer; transition: all var(--t-fast);
+}
+.ep-setdef:hover { color: var(--c-cyan); border-color: var(--c-cyan-line); }
+.ep-vision {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--tx-3); cursor: pointer; user-select: none;
+  border: 1px solid var(--line-1); border-radius: var(--r-pill); padding: 3px 10px;
+  transition: all var(--t-fast);
+}
+.ep-vision:hover { border-color: var(--line-2); color: var(--tx-2); }
+.ep-vision.on { color: var(--c-cyan); border-color: var(--c-cyan-line); background: var(--c-cyan-soft); }
+/* 字段网格：label 在上、控件在下，两行三列 */
+.ep-fields { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px 12px; }
+.ep-f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ep-f > label { font-size: 10.5px; color: var(--tx-4); letter-spacing: 0.3px; }
+.ep-f .input, .ep-f .sel { width: 100%; height: 32px; }
+.ep-f-sm .input { max-width: 110px; }
+.ep-f-wide { grid-column: 1 / -1; }
+.ep-del-wrap { display: flex; align-items: end; justify-content: flex-end; }
 /* 目录分组：组间留白 + 分组卡片感 */
 .dir-group {
   margin-bottom: 22px; padding-bottom: 18px;
