@@ -182,7 +182,7 @@ export default function SettingsPage() {
   const dirPaths = (kind: string) => cfg.directories.find((x) => x.kind === kind)?.paths ?? [];
 
   const DirList = ({ kind, label, hint }: { kind: string; label: string; hint: string }) => (
-    <div className="set-field">
+    <div className="set-field dir-group">
       <div className="lbl">
         {label}
         <div className="sub">{hint}</div>
@@ -288,12 +288,24 @@ export default function SettingsPage() {
                 兼容 OpenAI Chat Completions 格式。支持 OpenAI / DeepSeek / 智谱 / Ollama / 自定义网关。改完记得保存。
                 勾选「图片理解」的模型可在提示词助手中上传图片进行分析。
               </div>
-              {cfg.endpoints.map((e) => (
-                <div key={e.id} className="set-field" style={{ alignItems: "center" }}>
-                  <div className="lbl">
+              {cfg.endpoints.map((e, idx) => (
+                <div key={e.id} className="ep-card">
+                  <div className="ep-head">
+                    <span className="ep-idx">#{idx + 1}</span>
                     <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
                       <input type="radio" checked={cfg.default_endpoint_id === e.id} onChange={() => setDefault(e.id)} />
                       默认
+                    </label>
+                    <label
+                      style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginLeft: 12 }}
+                      title="勾选后，提示词助手可上传图片让该模型分析（需模型本身支持视觉能力，如 gpt-4o / qwen-vl 等）"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!e.vision}
+                        onChange={(ev) => patchEndpoint(e.id, { vision: ev.target.checked })}
+                      />
+                      🖼 图片理解
                     </label>
                   </div>
                   <div className="v">
@@ -325,17 +337,6 @@ export default function SettingsPage() {
                           onChange={(ev) => patchEndpoint(e.id, { timeout_secs: Number(ev.target.value) || 60 })} title="超时（秒）" />
                       </div>
                     </div>
-                    <label
-                      style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer", marginTop: 2 }}
-                      title="勾选后，提示词助手可上传图片让该模型分析（需模型本身支持视觉能力，如 gpt-4o / qwen-vl 等）"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!!e.vision}
-                        onChange={(ev) => patchEndpoint(e.id, { vision: ev.target.checked })}
-                      />
-                      🖼 图片理解
-                    </label>
                   </div>
                 </div>
               ))}

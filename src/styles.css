@@ -472,10 +472,30 @@ label { vertical-align: middle; }
 .set-side .s.active { background: var(--c-cyan-soft); color: var(--c-cyan); border-left-color: var(--c-cyan); }
 .set-side .s .ico { font-size: 13px; width: 16px; text-align: center; }
 .set-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.set-field { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; margin-bottom: 10px; }
+.set-field { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; margin-bottom: 18px; }
 .set-field .lbl { font-size: 12.5px; color: var(--tx-2); padding-top: 7px; }
 .set-field .lbl .sub { font-size: 10.5px; color: var(--tx-4); margin-top: 3px; }
 .set-field .v { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* 模型 API 端点卡片：多端点之间明确分隔 */
+.ep-card {
+  display: flex; gap: 14px; align-items: flex-start;
+  border: 1px solid var(--line-1); border-radius: var(--r-7);
+  padding: 12px 14px; margin-bottom: 14px; background: var(--bg-2);
+  transition: border-color var(--t-fast);
+}
+.ep-card:hover { border-color: var(--line-2); }
+.ep-head {
+  display: flex; flex-direction: column; gap: 8px; flex: none;
+  font-size: 12px; color: var(--tx-2); min-width: 64px;
+}
+.ep-idx { font-family: var(--f-mono); font-size: 11px; color: var(--tx-4); }
+/* 目录分组：组间留白 + 分组卡片感 */
+.dir-group {
+  margin-bottom: 22px; padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-1);
+}
+.dir-group:last-of-type { border-bottom: none; margin-bottom: 8px; }
+.dir-group .v { gap: 10px; }
 .set-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .hint { font-size: 11px; color: var(--tx-4); line-height: 1.6; }
 .set-divider { height: 1px; background: var(--line-1); margin: 14px 0; }
