@@ -1,21 +1,30 @@
 import { useRef, useState } from "react";
-import { useStore, H3Asset, H3Draft, H3Mode } from "../store";
+import { useStore, H3Asset, H3HistoryEntry, H3Mode } from "../store";
 import { api, ChatMessage } from "../api";
 import { buildH3System, h3ParamPrefix } from "../h3";
-import { AssetChip, AssetPickerPanel, AssetRef, PickerItem } from "./h3parts";
+import { AssetPickerPanel, PickerItem } from "./h3parts";
 
 const RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "16:9", "9:16", "21:9"];
 
-/** 生成模式：资源配额（T2V 无资源；I2V 单图；FL2V 两图；R2V 全量） */
+/** 生成模式：资源配额（T2V 无资源；I2V 单图；FL2V 首尾帧各一张，允许缺尾帧；R2V 全量） */
 const MODE_META: {
   mode: H3Mode; label: string; full: string; desc: string;
   img: number; vid: number; aud: number;
 }[] = [
   { mode: "T2V",  label: "T2V",  full: "文生视频",   desc: "纯文本构建时间线",       img: 0, vid: 0, aud: 0 },
   { mode: "I2V",  label: "I2V",  full: "图生视频",   desc: "单图作为首帧",           img: 1, vid: 0, aud: 0 },
-  { mode: "FL2V", label: "FL2V", full: "首尾帧生视频", desc: "图1 首帧 + 图2 尾帧",    img: 2, vid: 0, aud: 0 },
+  { mode: "FL2V", label: "FL2V", full: "首尾帧生视频", desc: "首帧必选，尾帧可选",      img: 2, vid: 0, aud: 0 },
   { mode: "R2V",  label: "R2V",  full: "参考生视频",  desc: "9 图 · 3 视频 · 3 音频", img: 9, vid: 3, aud: 3 },
 ];
+
+/** FL2V 模式下图片槽位名称：首帧 / 尾帧 */
+const slotLabel = (tab: AssetTab, idx: number, mode: H3Mode): string => {
+  if (mode === "FL2V" && tab === "image") {
+    return idx === 0 ? "首帧" : "尾帧";
+  }
+  const kindLabel = tab === "image" ? "图片" : tab === "video" ? "视频" : "音频";
+  return `${kindLabel}${idx + 1}`;
+};
 
 type AssetTab = "image" | "video" | "audio";
 const TAB_META: { tab: AssetTab; label: string; accept: string; icon: string }[] = [
@@ -29,6 +38,75 @@ const modeQuota = (mode: H3Mode, tab: AssetTab): number => {
   return tab === "image" ? m.img : tab === "video" ? m.vid : m.aud;
 };
 
+function H3HistoryItem({ item }: { item: H3HistoryEntry }) {
+  const { toast } = useStore();
+  const [open, setOpen] = useState(false);
+
+  const copy = async (text: string, label: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`${label}已复制`, "ok");
+    } catch {
+      toast("复制失败", "err");
+    }
+  };
+
+  return (
+    <div className={`ph-item ${open ? "open" : ""}`}>
+      <div className="ph-head" onClick={() => setOpen(!open)} title={open ? "收起" : "展开"}>
+        <span className="ph-arrow">{open ? "▾" : "▸"}</span>
+        <span className="ph-time">{item.time.slice(5, 16)}</span>
+        {item.model && <span className="ph-model">{item.model}</span>}
+        {item.assets.length > 0 && <span className="ph-imgs">资源×{item.assets.length}</span>}
+        <span className="ph-sum mono">
+          [{item.mode},{item.ratio},{item.duration}s] {item.user.replace(/\s+/g, " ").slice(0, 50)}{item.user.length > 50 ? "…" : ""}
+        </span>
+        <span className="ph-out-len">{item.output.length} 字</span>
+      </div>
+
+      {open && (
+        <div className="ph-body">
+          <div className="ph-sec">
+            <div className="ph-sec-h">
+              <span>用户提示词（{item.mode} · {item.systemMode} 指南 · T {item.temperature.toFixed(2)}）</span>
+              <button className="ph-copy" onClick={() => copy(item.user, "用户提示词 ")}>📋 复制</button>
+            </div>
+            <div className="ph-sec-b mono">{item.user}</div>
+          </div>
+
+          {item.assets.length > 0 && (
+            <div className="ph-sec">
+              <div className="ph-sec-h"><span>引用资源</span></div>
+              <div className="ph-sec-b mono">{item.assets.map((a) => `${a.kind === "image" ? "图片" : a.kind === "video" ? "视频" : "音频"}:${a.name}`).join("\n")}</div>
+            </div>
+          )}
+
+          <div className="ph-sec">
+            <div className="ph-sec-h">
+              <span>生成内容</span>
+              <button className="ph-copy" onClick={() => copy(item.output, "生成内容 ")}>📋 复制</button>
+            </div>
+            <div className="ph-sec-b mono out">{item.output}</div>
+          </div>
+
+          <div className="ph-ops">
+            <button
+              className="btn btn-line btn-xs"
+              onClick={() => useStore.getState().setH3Draft({ text: item.user, output: item.output })}
+            >
+              ↩ 载入到编辑器
+            </button>
+            <button className="btn btn-line btn-xs" onClick={() => copy(`【用户】${item.user}\n\n【生成】${item.output}`, "完整记录 ")}>
+              📋 复制全部
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function H3Page() {
   const { config, toast, h3Draft: draft, setH3Draft, h3History, addH3History, clearH3History } = useStore();
   const [busy, setBusy] = useState(false);
@@ -38,10 +116,9 @@ export default function H3Page() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerItems, setPickerItems] = useState<PickerItem[]>([]);
   const [pickerActive, setPickerActive] = useState(0);
-  // @ 触发点：{文本段下标, @ 前的光标偏移}
-  const atTriggerRef = useRef<{ partIdx: number; textOffset: number } | null>(null);
-  // 插入 chip 后希望聚焦的文本段下标（渲染后由 effect 消费）
-  const caretHintRef = useRef<number | null>(null);
+  // 触发 @ 的光标偏移（选择后在原位插入「图片1」等文字）
+  const atOffsetRef = useRef<number | null>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputTabRef = useRef<AssetTab>("image");
@@ -56,27 +133,19 @@ export default function H3Page() {
   const setAssets = (k: AssetTab, fn: (prev: H3Asset[]) => H3Asset[]) =>
     setH3Draft(k === "image" ? { images: fn(draft.images) } : k === "video" ? { videos: fn(draft.videos) } : { audios: fn(draft.audios) });
 
-  /** 清除 parts 中对指定 asset 的引用，并重排剩余引用的编号 */
+  /** 删除资源后，同步清理提示词文本中的引用标签：被删的移除，后面同类的编号前移 */
   const removeAsset = (tab: AssetTab, id: string) => {
-    const remain = assetsOf(tab).filter((a) => a.id !== id);
-    const removedIdx = assetsOf(tab).findIndex((a) => a.id === id); // 0-based
-    setAssets(tab, () => remain);
-    const nextParts: H3Draft["parts"] = draft.parts.map((p) => {
-      if (p.type !== "ref") return p;
-      try {
-        const r = JSON.parse(p.assetId) as AssetRef;
-        if (r.kind === tab) {
-          const oldIdx = r.index - 1;
-          if (oldIdx === removedIdx) return null; // 引用被删，chip 移除
-          if (oldIdx > removedIdx) {
-            const nr: AssetRef = { ...r, index: r.index - 1 };
-            return { type: "ref", assetId: JSON.stringify(nr) };
-          }
-        }
-        return p;
-      } catch { return p; }
-    }).filter((p): p is H3Draft["parts"][number] => p !== null);
-    setH3Draft({ parts: nextParts });
+    const list = assetsOf(tab);
+    const removedIdx = list.findIndex((a) => a.id === id); // 0-based
+    const remain = list.filter((a) => a.id !== id);
+    const kindLabel = tab === "image" ? "图片" : tab === "video" ? "视频" : "音频";
+    const nextText = draft.text.replace(new RegExp(`${kindLabel}\\d+`, "g"), (m) => {
+      const n = parseInt(m.slice(kindLabel.length), 10);
+      if (n === removedIdx + 1) return ""; // 被删引用直接移除
+      if (n > removedIdx + 1) return `${kindLabel}${n - 1}`; // 编号前移
+      return m;
+    });
+    setH3Draft({ [tab === "image" ? "images" : tab === "video" ? "videos" : "audios"]: remain, text: nextText });
   };
 
   const pickFiles = (tab: AssetTab) => {
@@ -151,7 +220,7 @@ export default function H3Page() {
       reader.readAsDataURL(file);
     });
 
-  /* ---------- 模式切换：超出新配额的资源自动移除（保留前 room 个） ---------- */
+  /* ---------- 模式切换：清空提示词与结果，超出新配额的资源自动移除（保留前 room 个） ---------- */
   const switchMode = (mode: H3Mode) => {
     if (mode === draft.mode) return;
     const imgKeep = assetsOf("image").slice(0, modeQuota(mode, "image"));
@@ -166,16 +235,12 @@ export default function H3Page() {
       images: imgKeep,
       videos: vidKeep,
       audios: audKeep,
-      parts: draft.parts.filter((p) => {
-        if (p.type !== "ref") return true;
-        try {
-          const r = JSON.parse(p.assetId) as AssetRef;
-          const kindArr = r.kind === "image" ? imgKeep : r.kind === "video" ? vidKeep : audKeep;
-          return r.index <= kindArr.length;
-        } catch { return true; }
-      }),
+      // 不同模式的提示词写法完全不同（base 三字段 vs ref 六段），切换即清空重写
+      text: "",
+      output: "",
     });
-    if (removedAny) toast(`已切换到 ${mode}：超出配额的资源及其引用已移除`, "info");
+    atOffsetRef.current = null;
+    if (removedAny) toast(`已切换到 ${mode}：提示词已清空，超出配额的资源已移除`, "info");
   };
 
   /* ---------- @ 浮层 ---------- */
@@ -196,67 +261,24 @@ export default function H3Page() {
 
   const applyPick = (it: PickerItem) => {
     setPickerOpen(false);
-    insertRefAfterText({ kind: it.kind, index: it.index, name: it.name, thumb: it.thumb });
+    insertRefText(slotLabel(it.kind, it.index - 1, draft.mode));
   };
 
-  /**
-   * 在「触发 @ 的光标位置」插入引用 chip：
-   * - 记录触发浮层时的 {文本段下标, @ 前光标偏移}
-   * - 插入时以 @ 所在偏移为界，把该文本段切成前/后两段，chip 落在中间
-   * - 若无记录（异常路径）退化为段末插入
-   */
-  const insertRefAfterText = (r: AssetRef) => {
-    const parts = [...draft.parts];
-    const a = atTriggerRef.current;
-    atTriggerRef.current = null;
-    let inserted = false;
-    if (a && parts[a.partIdx]?.type === "text") {
-      const tp = parts[a.partIdx] as { type: "text"; text: string };
-      const cut = a.textOffset; // @ 字符所在偏移（@ 即被丢弃）
-      const before = tp.text.slice(0, cut);
-      const after = tp.text.slice(cut + 1); // 跳过 @
-      const replacement: H3Draft["parts"] = [
-        { type: "text", text: before },
-        { type: "ref", assetId: JSON.stringify(r) },
-        { type: "text", text: after },
-      ];
-      parts.splice(a.partIdx, 1, ...replacement);
-      inserted = true;
-      // 光标回到 chip 后的文本段开头
-      caretHintRef.current = a.partIdx + 2;
-    } else {
-      parts.push({ type: "ref", assetId: JSON.stringify(r) });
-      caretHintRef.current = parts.length; // 追加的新文本段
-      parts.push({ type: "text", text: "" });
-    }
-    if (!inserted) {
-      // 上面 push 了 ref 与空文本段，无需再处理
-    }
-    setH3Draft({ parts });
+  /** 在触发 @ 的光标处把 @ 替换为引用文字（如「图片1」），光标落在文字之后 */
+  const insertRefText = (label: string) => {
+    const el = editorRef.current;
+    const cur = draft.text;
+    let pos = atOffsetRef.current;
+    atOffsetRef.current = null;
+    if (pos === null) pos = el ? el.selectionStart : cur.length;
+    const next = cur.slice(0, pos) + label + cur.slice(pos + 1); // @ 占 1 字符，直接替换
+    const caret = pos + label.length;
+    setH3Draft({ text: next });
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
   };
-
-  /** chip 上的 × 移除引用（按 assetId 匹配） */
-  const removeRefPart = (assetId: string) => {
-    setH3Draft({ parts: draft.parts.filter((p) => !(p.type === "ref" && p.assetId === assetId)) });
-  };
-
-  /* ---------- parts 工具 ---------- */
-  /** parts → 纯文本（ref 转成 <图片1> 标签形式） */
-  const partsToText = () =>
-    draft.parts
-      .map((p) => {
-        if (p.type === "text") return p.text;
-        try {
-          const r = JSON.parse(p.assetId) as AssetRef;
-          const label = `${r.kind === "image" ? "图片" : r.kind === "video" ? "视频" : "音频"}${r.index}`;
-          return `<${label}>`;
-        } catch {
-          return "";
-        }
-      })
-      .join("");
-
-  const partsToUserPrompt = () => `${h3ParamPrefix(draft.mode, draft.ratio, draft.duration)}${partsToText()}`;
 
   /* ---------- 生成 ---------- */
   const generate = async () => {
@@ -269,11 +291,11 @@ export default function H3Page() {
       toast("I2V（图生视频）需要恰好 1 张图片作为首帧", "err");
       return;
     }
-    if (draft.mode === "FL2V" && draft.images.length !== 2) {
-      toast("FL2V（首尾帧）需要恰好 2 张图片：图1 首帧、图2 尾帧", "err");
+    if (draft.mode === "FL2V" && (draft.images.length < 1 || draft.images.length > 2)) {
+      toast("FL2V（首尾帧）需要 1~2 张图片：首帧必选，尾帧可选", "err");
       return;
     }
-    const bodyText = partsToText().trim();
+    const bodyText = draft.text.trim();
     if (!bodyText) {
       toast("请描述需求（可用 @ 引用资源）", "err");
       return;
@@ -285,7 +307,7 @@ export default function H3Page() {
       audios: draft.audios.length,
       duration: draft.duration,
     });
-    const userPrompt = partsToUserPrompt();
+    const userPrompt = `${h3ParamPrefix(draft.mode, draft.ratio, draft.duration, draft.images.length)}${draft.text}`;
     setBusy(true);
     setH3Draft({ output: "" });
     try {
@@ -410,7 +432,7 @@ export default function H3Page() {
           </div>
         </div>
         <div className="hint" style={{ marginTop: 8 }}>
-          提交格式预览：<span className="mono">{h3ParamPrefix(draft.mode, draft.ratio, draft.duration)}</span>你的描述…
+          提交格式预览：<span className="mono">{h3ParamPrefix(draft.mode, draft.ratio, draft.duration, draft.images.length)}</span>你的描述…
         </div>
       </div>
 
@@ -444,14 +466,20 @@ export default function H3Page() {
                       ) : (
                         <span className={`h3-asset-ico ${tab}`}>{tab === "video" ? "▶" : "♪"}</span>
                       )}
-                      <span className="h3-asset-name">{label}{i + 1}</span>
+                      <span className="h3-asset-name">{slotLabel(tab, i, draft.mode)}</span>
                       <button className="h3-asset-x" title="移除" onClick={() => removeAsset(tab, a.id)}>×</button>
                     </div>
                   ))}
                   {list.length < q && (
                     <button className="h3-asset-add" onClick={() => pickFiles(tab)} title={`添加${label}`}>
                       ＋
+                      {/* 空槽位文字说明：FL2V 图片显示「首帧/尾帧」，其余显示序号名 */}
+                      <span className="h3-slot-hint">{slotLabel(tab, list.length, draft.mode)}</span>
                     </button>
+                  )}
+                  {/* FL2V 尾帧可选说明 */}
+                  {draft.mode === "FL2V" && tab === "image" && (
+                    <span className="hint" style={{ alignSelf: "center" }}>首帧必选，尾帧可留空</span>
                   )}
                 </div>
               </div>
@@ -465,72 +493,44 @@ export default function H3Page() {
         />
       </div>
 
-      {/* 提示词编辑区（rich parts 渲染 + @ 浮层） */}
+      {/* 提示词编辑区（纯文本 + @ 引用插入） */}
       <div className="panel" style={{ marginBottom: 12, position: "relative" }}>
         <h3><i className="dot" />提示词
-          <span className="h-meta">输入 @ 引用资源；图片以内嵌缩略展示</span>
+          <span className="h-meta">输入 @ 引用资源，选择后以「图片1」等文字插入</span>
         </h3>
-        <div className="h3-editor" onClick={(e) => {
-          const ta = e.currentTarget.querySelector("textarea");
-          ta?.focus();
-        }}>
-          {draft.parts.map((p, i) => {
-            if (p.type === "text") {
-              return (
-                <textarea
-                  key={i}
-                  ref={(el) => {
-                    // 渲染后把光标放回 chip 后的文本段
-                    if (caretHintRef.current === i && el) {
-                      caretHintRef.current = null;
-                      el.focus();
-                      el.setSelectionRange(0, 0);
-                    }
-                  }}
-                  className="h3-editable"
-                  rows={Math.max(1, Math.ceil((p.text.length || 1) / 60))}
-                  value={p.text}
-                  placeholder={draft.parts.length === 1 ? "描述你的视频需求… 输入 @ 可引用上方资源" : ""}
-                  onChange={(e) => {
-                    const parts = [...draft.parts];
-                    parts[i] = { type: "text", text: e.target.value };
-                    setH3Draft({ parts });
-                    // 检测 @ 触发：记录文本段下标与光标位置（@ 所在偏移）
-                    if (e.target.value.endsWith("@")) {
-                      atTriggerRef.current = { partIdx: i, textOffset: e.target.selectionStart - 1 };
-                      openPicker();
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (pickerOpen) {
-                      if (e.key === "ArrowDown") { e.preventDefault(); setPickerActive((pickerActive + 1) % pickerItems.length); return; }
-                      if (e.key === "ArrowUp") { e.preventDefault(); setPickerActive((pickerActive - 1 + pickerItems.length) % pickerItems.length); return; }
-                      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); applyPick(pickerItems[pickerActive]); return; }
-                      if (e.key === "Escape") { setPickerOpen(false); return; }
-                    }
-                  }}
-                />
-              );
+        <textarea
+          ref={editorRef}
+          className="h3-editable"
+          rows={4}
+          value={draft.text}
+          placeholder="描述你的视频需求… 输入 @ 可引用上方资源"
+          onChange={(e) => {
+            const v = e.target.value;
+            setH3Draft({ text: v });
+            // 输入 @：光标前一个字符是 @ 即触发（不限位置），记录 @ 偏移并弹出资源浮层
+            const pos = e.target.selectionStart;
+            if (pos > 0 && v[pos - 1] === "@") {
+              atOffsetRef.current = pos - 1;
+              openPicker();
             }
-            // ref chip
-            try {
-              const r = JSON.parse(p.assetId) as AssetRef;
-              return (
-                <span key={i} className="h3-chip-wrap">
-                  <AssetChip ref_={r} onRemove={() => removeRefPart(p.assetId)} />
-                </span>
-              );
-            } catch { return null; }
-          })}
-          {pickerOpen && (
-            <AssetPickerPanel
-              items={pickerItems}
-              activeIdx={pickerActive}
-              setActiveIdx={setPickerActive}
-              onPick={applyPick}
-            />
-          )}
-        </div>
+          }}
+          onKeyDown={(e) => {
+            if (pickerOpen) {
+              if (e.key === "ArrowDown") { e.preventDefault(); setPickerActive((pickerActive + 1) % pickerItems.length); return; }
+              if (e.key === "ArrowUp") { e.preventDefault(); setPickerActive((pickerActive - 1 + pickerItems.length) % pickerItems.length); return; }
+              if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); applyPick(pickerItems[pickerActive]); return; }
+              if (e.key === "Escape") { setPickerOpen(false); return; }
+            }
+          }}
+        />
+        {pickerOpen && (
+          <AssetPickerPanel
+            items={pickerItems}
+            activeIdx={pickerActive}
+            setActiveIdx={setPickerActive}
+            onPick={applyPick}
+          />
+        )}
         {hint && <div className="hint" style={{ marginTop: 6, color: "var(--c-amber)" }}>{hint}</div>}
       </div>
 
@@ -554,7 +554,7 @@ export default function H3Page() {
       <div className="ph-panel">
         <div className="ph-panel-h" onClick={() => setHistOpen(!histOpen)}>
           <span className="ph-arrow">{histOpen ? "▾" : "▸"}</span>
-          <span className="ph-title">⏱ H3 提示词历史</span>
+          <span className="ph-title">⏱ MiniMax 助手历史</span>
           <span className="h-meta">{h3History.length} 条</span>
           <span style={{ flex: 1 }} />
           <button
@@ -577,14 +577,7 @@ export default function H3Page() {
               <div className="ph-empty">暂无历史 —— 每次生成会记录模式、参数前缀、资源引用与输出。</div>
             )}
             {h3History.map((item) => (
-              <div key={item.id} className="ph-item">
-                <div className="ph-head" title={item.user}>
-                  <span className="ph-time">{item.time.slice(5, 16)}</span>
-                  {item.model && <span className="ph-model">{item.model}</span>}
-                  <span className="ph-sum mono">[{item.mode},{item.ratio},{item.duration}s] {item.assets.length ? `资源×${item.assets.length} · ` : ""}{item.user.replace(/\s+/g, " ").slice(0, 50)}{item.user.length > 50 ? "…" : ""}</span>
-                  <span className="ph-out-len">{item.output.length} 字</span>
-                </div>
-              </div>
+              <H3HistoryItem key={item.id} item={item} />
             ))}
           </div>
         )}

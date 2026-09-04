@@ -15,6 +15,7 @@ const SECTIONS = [
   { key: "skills", label: "Skills", ico: "⚡" },
   { key: "general", label: "通用", ico: "⚙" },
   { key: "ffmpeg", label: "FFmpeg", ico: "▶" },
+  { key: "backup", label: "导入导出", ico: "⇄" },
   { key: "about", label: "关于", ico: "ⓘ" },
 ];
 
@@ -256,6 +257,50 @@ export default function SettingsPage() {
     await openUrl("https://www.gyan.dev/ffmpeg/builds/");
   };
 
+  // ---- 配置导入导出 ----
+  const exportConfig = async () => {
+    if (!draft) return;
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const now = new Date();
+      const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+      const path = await save({
+        defaultPath: `comfyui-helper-config-${date}.json`,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await api.writeTextFile(path, JSON.stringify(draft, null, 2));
+      toast("配置已导出", "ok");
+    } catch (e) {
+      toast(`导出失败: ${e}`, "err");
+    }
+  };
+
+  const importConfig = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const sel = await open({
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!sel) return;
+      const path = Array.isArray(sel) ? sel[0] : sel;
+      const raw = await api.readTextFile(path);
+      const parsed = JSON.parse(raw) as AppConfig;
+      // 最小合法性校验
+      if (!parsed || !Array.isArray(parsed.endpoints) || !parsed.general) {
+        throw new Error("文件结构不符合 ComfyUI Helper 配置格式");
+      }
+      // 写入草稿并立即持久化（导入即生效，用户可在界面上继续微调后保存）
+      setDraft(parsed);
+      await updateConfig(parsed);
+      toast("配置已导入并保存生效", "ok");
+    } catch (e) {
+      toast(`导入失败: ${e instanceof Error ? e.message : e}`, "err");
+    }
+  };
+
   return (
     <div>
       <div className="page-h">
@@ -295,7 +340,7 @@ export default function SettingsPage() {
               </h3>
               <div className="desc" style={{ marginBottom: 12 }}>
                 兼容 OpenAI Chat Completions 格式。支持 OpenAI / DeepSeek / 智谱 / Ollama / 自定义网关。改完记得保存。
-                勾选「图片理解」的模型可在提示词助手中上传图片进行分析。
+                勾选「图片理解」的模型可在 AI润色 中上传图片进行分析。
               </div>
               {cfg.endpoints.map((e, idx) => {
                 const isDefault = cfg.default_endpoint_id === e.id;
@@ -310,7 +355,7 @@ export default function SettingsPage() {
                         placeholder="端点名称"
                       />
                       {isDefault ? (
-                        <span className="ep-def" title="提示词助手等功能的默认模型">默认</span>
+                        <span className="ep-def" title="AI润色 等功能的默认模型">默认</span>
                       ) : (
                         <button
                           className="ep-setdef"
@@ -322,7 +367,7 @@ export default function SettingsPage() {
                       )}
                       <label
                         className={`ep-vision ${e.vision ? "on" : ""}`}
-                        title="勾选后，提示词助手可上传图片让该模型分析（需模型本身支持视觉能力，如 gpt-4o / qwen-vl 等）"
+                        title="勾选后，AI润色 可上传图片让该模型分析（需模型本身支持视觉能力，如 gpt-4o / qwen-vl 等）"
                       >
                         <input
                           type="checkbox"
@@ -404,7 +449,7 @@ export default function SettingsPage() {
                 </button>
               </h3>
               <div className="desc" style={{ marginBottom: 12 }}>
-                在「提示词助手」中选择使用的模板（可选增强）；也可勾选「手动填写」直接用输入框写。
+                在「AI润色」中选择使用的模板（可选增强）；也可勾选「手动填写」直接用输入框写。
               </div>
               {cfg.templates.map((t, idx) => (
                 <div key={t.id} className="prompt-editor">
@@ -433,7 +478,7 @@ export default function SettingsPage() {
                 <button className="btn btn-primary btn-sm" onClick={() => addSkill("新 Skill", "")}>＋ 新建</button>
               </h3>
               <div className="desc" style={{ marginBottom: 12 }}>
-                导入/维护提示词技能片段，在「提示词助手」里按需勾选（可选增强），会拼接到 System Prompt 最前。
+                导入/维护提示词技能片段，在「AI润色」里按需勾选（可选增强），会拼接到 System Prompt 最前。
               </div>
               {cfg.skills.map((s) => {
                 const open = expandedSkills.has(s.id);
@@ -491,7 +536,7 @@ export default function SettingsPage() {
                           style={{ marginTop: 8 }}
                         />
                         <div className="hint" style={{ marginTop: 6 }}>
-                          将作为 <span className="mono">【Skill: {s.name}】</span> 拼接到 System Prompt（提示词助手勾选时生效）。
+                          将作为 <span className="mono">【Skill: {s.name}】</span> 拼接到 System Prompt（AI润色 勾选时生效）。
                         </div>
                       </>
                     )}
@@ -646,10 +691,33 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {section === "backup" && (
+            <div className="card">
+              <h3>
+                <span className="num">07</span>导入导出
+              </h3>
+              <div className="desc" style={{ marginBottom: 12 }}>
+                导出全部配置（模型 API 端点含密钥、System Prompt 模板、Skills、目录、通用设置）为 JSON 备份文件，
+                在另一台电脑导入即可完成迁移。<b>备份文件含 API 密钥，请妥善保管。</b>
+              </div>
+              <div className="set-row">
+                <button className="btn btn-primary" onClick={exportConfig}>
+                  ⤒ 导出到文件…
+                </button>
+                <button className="btn btn-line" onClick={importConfig}>
+                  ⤓ 从文件导入…
+                </button>
+              </div>
+              <div className="hint" style={{ marginTop: 12 }}>
+                导出文件名默认为 comfyui-helper-config-日期.json。导入时会覆盖当前全部配置，操作前请先导出一份当前配置作为备份。
+              </div>
+            </div>
+          )}
+
           {section === "about" && (
             <div className="card">
               <h3>
-                <span className="num">07</span>关于
+                <span className="num">08</span>关于
               </h3>
               <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "6px 0" }}>
                 <div className="sb-logo" style={{ width: 44, height: 44 }} />

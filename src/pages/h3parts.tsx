@@ -1,44 +1,9 @@
 import { useMemo, useRef } from "react";
-import { create } from "zustand";
 
-/* ============ 行内资源引用 chip ============ */
-export interface AssetRef {
-  kind: "image" | "video" | "audio";
-  index: number;   // 类内序号（从 1 开始）
-  name: string;
-  thumb?: string;  // 图片缩略 data URL
-}
-
+/* ============ @ 资源选择浮层 ============ */
 const KIND_LABEL = { image: "图片", video: "视频", audio: "音频" } as const;
 const KIND_ICON = { image: "", video: "▶", audio: "♪" } as const;
 
-export function AssetChip({ ref_, onRemove }: { ref_: AssetRef; onRemove?: () => void }) {
-  const label = `${KIND_LABEL[ref_.kind]}${ref_.index}`;
-  return (
-    <span className={`mref-chip ${ref_.kind}`} contentEditable={false} data-ref={label}>
-      {ref_.kind === "image" && ref_.thumb ? (
-        <img className="mref-thumb" src={ref_.thumb} alt="" />
-      ) : (
-        <span className="mref-ico">{KIND_ICON[ref_.kind]}</span>
-      )}
-      <span className="mref-label">{label}</span>
-      {onRemove && (
-        <button
-          className="mref-x"
-          title="移除引用"
-          onMouseDown={(e) => {
-            e.preventDefault(); // 防止夺走编辑器焦点
-            onRemove();
-          }}
-        >
-          ×
-        </button>
-      )}
-    </span>
-  );
-}
-
-/* ============ @ 资源选择浮层 ============ */
 export interface PickerItem {
   key: string;
   kind: "image" | "video" | "audio";
@@ -85,6 +50,3 @@ export function AssetPickerPanel({
     </div>
   );
 }
-
-/* ============ 纯展示用小 store（避免循环依赖主 store 时的额外接线） ============ */
-export const useNothing = create<() => void>(() => () => {});

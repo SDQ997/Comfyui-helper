@@ -260,7 +260,7 @@ export default function PromptPage() {
     <div>
       <div className="page-h">
         <div>
-          <h1>提示词助手</h1>
+          <h1>AI润色</h1>
           <div className="desc">
             填写需求即可直接生成；也可选择 Skill 与 System Prompt 模板让 AI
             按特定风格润色成 ComfyUI / 视频生成提示词。切换页面不会丢失当前内容。
@@ -444,7 +444,7 @@ export default function PromptPage() {
       <div className="ph-panel">
         <div className="ph-panel-h" onClick={() => setHistOpen(!histOpen)} title={histOpen ? "收起历史" : "展开历史"}>
           <span className="ph-arrow">{histOpen ? "▾" : "▸"}</span>
-          <span className="ph-title">⏱ 提示词历史</span>
+          <span className="ph-title">⏱ AI润色历史</span>
           <span className="h-meta">{promptHistory.length} 条</span>
           <span style={{ flex: 1 }} />
           <button
@@ -453,7 +453,7 @@ export default function PromptPage() {
             onClick={(e) => {
               e.stopPropagation();
               if (promptHistory.length === 0) return;
-              if (confirm(`确定清空全部 ${promptHistory.length} 条提示词历史？此操作不可恢复。`)) {
+              if (confirm(`确定清空全部 ${promptHistory.length} 条 AI润色历史？此操作不可恢复。`)) {
                 clearPromptHistory();
                 toast("历史已清空", "ok");
               }

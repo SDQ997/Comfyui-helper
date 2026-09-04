@@ -77,11 +77,16 @@ ${task}
 The user prompt may cite assets as <Picture N> / <Video N> / <Audio N> (already normalized). Use these exact labels in your output sections. Write rewrite sections in English; preserve dialogue, lyrics, and visible scene text in their original language.`;
 }
 
-/** 用户 prompt 开头的参数前缀：mode,ratio,Ns[,图片1为首帧，图片2为尾帧], */
-export function h3ParamPrefix(mode: string, ratio: string, durationSec: number): string {
+/**
+ * 用户 prompt 开头的参数前缀：mode,ratio,Ns[,首尾帧标注],
+ * FL2V 动态标注：两张图 → 「图片1为首帧，图片2为尾帧」；只有一张 → 「图片1为首帧」
+ */
+export function h3ParamPrefix(mode: string, ratio: string, durationSec: number, imgCount = 2): string {
   const base = `${mode},${ratio},${Math.round(durationSec)}s,`;
   if (mode === "FL2V") {
-    return `${base}图片1为首帧，图片2为尾帧,`;
+    if (imgCount >= 2) return `${base}图片1为首帧，图片2为尾帧,`;
+    if (imgCount === 1) return `${base}图片1为首帧,`;
+    return base;
   }
   return base;
 }

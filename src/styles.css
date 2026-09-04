@@ -679,7 +679,7 @@ label { vertical-align: middle; }
 }
 .meta-kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 11.5px; }
 
-/* 提示词助手：图片上传区 */
+/* AI润色：图片上传区 */
 .img-upload {
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
   padding: 8px; border: 1px dashed var(--line-2); border-radius: var(--r-5);
@@ -763,6 +763,7 @@ label { vertical-align: middle; }
 .log-drawer .cmd { color: var(--c-cyan); }
 .log-drawer .ok { color: var(--s-ok); }
 .log-drawer .err { color: var(--c-red); }
+.log-drawer .warn { color: var(--c-amber); }
 
 /* modal */
 .modal-mask {
@@ -906,39 +907,15 @@ label { vertical-align: middle; }
 }
 .h3-asset-add:hover { color: var(--c-cyan); border-color: var(--c-cyan-line); background: var(--c-cyan-soft); }
 
-/* 提示词编辑区（chips 与文本混排） */
-.h3-editor {
-  position: relative; background: var(--bg-1); border: 1px solid var(--line-1);
-  border-radius: var(--r-7); padding: 10px; min-height: 110px;
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start;
-}
-.h3-editor:focus-within { border-color: var(--c-cyan-line); }
+/* 提示词编辑区（纯文本 textarea + @ 引用浮层） */
 .h3-editable {
-  flex: 1; min-width: 200px; background: transparent; border: none; outline: none;
-  color: var(--tx-1); font-size: 12.5px; line-height: 1.8; resize: none;
-  font-family: var(--f-ui); overflow: hidden;
+  width: 100%; min-height: 132px; background: var(--bg-3); border: 1px solid var(--line-1);
+  color: var(--tx-1); font-size: 12.5px; line-height: 1.8; resize: vertical;
+  font-family: var(--f-ui); padding: 10px; border-radius: var(--r-5);
+  transition: border-color var(--t-fast);
 }
+.h3-editable:focus { border-color: var(--c-cyan-line); outline: none; }
 .h3-editable::placeholder { color: var(--tx-4); }
-.h3-chip-wrap { display: inline-flex; align-items: center; }
-
-/* 资源引用 chip（提示词内嵌） */
-.mref-chip {
-  display: inline-flex; align-items: center; gap: 5px; height: 26px;
-  border-radius: var(--r-pill); padding: 0 10px 0 4px;
-  font-size: 11px; font-weight: 500; user-select: none; vertical-align: middle;
-}
-.mref-chip.image { background: rgba(240, 180, 41, 0.16); border: 1px solid rgba(240, 180, 41, 0.55); color: #f0b429; }
-.mref-chip.video { background: rgba(122, 162, 247, 0.14); border: 1px solid rgba(122, 162, 247, 0.55); color: #7aa2f7; }
-.mref-chip.audio { background: rgba(240, 180, 41, 0.1); border: 1px solid rgba(240, 180, 41, 0.45); color: var(--c-amber); }
-[data-theme="light"] .mref-chip.video { color: #3b5fd9; background: rgba(59, 95, 217, 0.1); border-color: rgba(59, 95, 217, 0.4); }
-.mref-thumb { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex: none; }
-.mref-ico { font-size: 11px; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.25); flex: none; }
-.mref-label { letter-spacing: 0.3px; }
-.mref-x {
-  background: none; border: none; color: inherit; opacity: 0.7; cursor: pointer;
-  font-size: 12px; padding: 0 0 0 2px; line-height: 1;
-}
-.mref-x:hover { opacity: 1; }
 
 /* @ 资源选择浮层 */
 .mref-picker {
@@ -961,3 +938,6 @@ label { vertical-align: middle; }
 .mref-item-ico.video { color: #7aa2f7; }
 .mref-item-ico.audio { color: var(--c-amber); }
 .mref-item-label { font-size: 12px; color: var(--tx-1); }
+
+/* FL2V 等空槽位说明 */
+.h3-slot-hint { font-size: 10px; color: var(--tx-4); margin-left: 4px; }

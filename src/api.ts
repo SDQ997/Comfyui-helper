@@ -47,7 +47,7 @@ export interface ApiEndpoint {
   api_key: string;
   model: string;
   timeout_secs: number;
-  /** 是否具备图片理解能力（勾选后提示词助手可上传图片） */
+  /** 是否具备图片理解能力（勾选后 AI润色 可上传图片） */
   vision?: boolean;
 }
 
@@ -106,6 +106,7 @@ export const api = {
   scanLoras: (dirs: string[]) => invoke<LoraEntry[]>("scan_loras", { dirs }),
   scanPlugins: (dir: string) => invoke<{ path: string; name: string }[]>("scan_plugins", { dir }),
   pluginStatus: (path: string) => invoke<GitStatus>("plugin_status", { path }),
+  pluginCheck: (path: string) => invoke<GitStatus>("plugin_check", { path }),
   pluginUpdate: (path: string) => invoke<GitStatus>("plugin_update", { path }),
   // hidden assets
   hiddenList: () => invoke<string[]>("hidden_list"),
@@ -141,6 +142,8 @@ export const api = {
     invoke<string>("chat_completion", { endpoint, messages, temperature: temperature ?? null }),
   // misc
   readTextFile: (path: string) => invoke<string>("read_text_file", { path }),
+  writeTextFile: (path: string, content: string) =>
+    invoke<void>("write_text_file", { path, content }),
   // logs
   logFetch: (afterId: number) => invoke<LogItem[]>("log_fetch", { afterId }),
   logEmit: (source: string, level: string, msg: string) =>

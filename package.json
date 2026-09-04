@@ -1,7 +1,7 @@
 {
   "name": "comfyui-helper",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.2",
   "description": "Lightweight ComfyUI assistant - prompt, assets, LoRA, plugins, video analysis",
   "license": "MIT",
   "type": "module",

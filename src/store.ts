@@ -5,7 +5,7 @@ interface Toast { id: number; text: string; kind: "ok" | "err" | "info"; }
 
 /** 提示词历史条目：一次成功生成的完整快照 */
 export interface PromptHistoryEntry {
-  id: number;
+  id: string;
   time: string;          // ISO 时间
   system: string;        // 实际拼接的 system prompt（含 Skill，可为空）
   user: string;          // 用户输入文本
@@ -15,7 +15,7 @@ export interface PromptHistoryEntry {
   model?: string;        // 端点名称快照
 }
 
-/** 提示词助手草稿：跨页面保留，切走再切回不丢内容 */
+/** AI润色草稿：跨页面保留，切走再切回不丢内容 */
 export interface PromptDraft {
   userInput: string;
   templateId: string;
@@ -40,7 +40,7 @@ export interface H3Asset {
 
 /** MiniMax 助手历史条目 */
 export interface H3HistoryEntry {
-  id: number;
+  id: string;
   time: string;
   mode: string;         // T2V / I2V / FL2V / R2V
   systemMode: string;   // base / ref（记录当次使用的指南）
@@ -59,8 +59,6 @@ export type H3Mode = "T2V" | "I2V" | "FL2V" | "R2V";
 export interface H3Draft {
   mode: H3Mode;
   text: string;
-  /** 富文本片段：文本 / 资源引用混排 */
-  parts: ({ type: "text"; text: string } | { type: "ref"; assetId: string })[];
   images: H3Asset[];
   videos: H3Asset[];
   audios: H3Asset[];
@@ -80,7 +78,8 @@ function loadHistory(): PromptHistoryEntry[] {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    // 旧数据用共享计数器生成 id，重启后可能重复 → 载入时统一重发，杜绝 React key 撞车
+    return Array.isArray(arr) ? arr.map((e: PromptHistoryEntry) => ({ ...e, id: newHistId() })) : [];
   } catch {
     return [];
   }
@@ -105,7 +104,8 @@ function loadH3History(): H3HistoryEntry[] {
     const raw = localStorage.getItem(H3_LS_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    // 同 loadHistory：旧数据 id 可能重复，载入时统一重发
+    return Array.isArray(arr) ? arr.map((e: H3HistoryEntry) => ({ ...e, id: newHistId() })) : [];
   } catch {
     return [];
   }
@@ -152,7 +152,8 @@ interface Store {
 }
 
 let toastId = 0;
-let histId = 0;
+/** 历史条目唯一 id：旧实现用共享计数器，重启后归零导致与已存条目 id 撞车（React key 重复 → 列表错乱/展不开），改用 UUID */
+const newHistId = () => crypto.randomUUID();
 
 export const useStore = create<Store>((set, get) => ({
   config: null,
@@ -178,7 +179,7 @@ export const useStore = create<Store>((set, get) => ({
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const time = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    const item: PromptHistoryEntry = { ...entry, id: ++histId, time };
+    const item: PromptHistoryEntry = { ...entry, id: newHistId(), time };
     set((s) => {
       const list = [item, ...s.promptHistory].slice(0, MAX_HISTORY);
       saveHistory(list);
@@ -193,7 +194,6 @@ export const useStore = create<Store>((set, get) => ({
   h3Draft: {
     mode: "T2V",
     text: "",
-    parts: [{ type: "text", text: "" }],
     images: [],
     videos: [],
     audios: [],
@@ -209,7 +209,7 @@ export const useStore = create<Store>((set, get) => ({
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const time = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    const item: H3HistoryEntry = { ...entry, id: ++histId, time };
+    const item: H3HistoryEntry = { ...entry, id: newHistId(), time };
     set((s) => {
       const list = [item, ...s.h3History].slice(0, H3_MAX_HISTORY);
       saveH3History(list);

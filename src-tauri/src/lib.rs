@@ -115,6 +115,7 @@ pub fn run() {
             config::save_config,
             config::get_data_dir,
             config::read_text_file,
+            config::write_text_file,
             // scanning
             scan::scan_assets,
             scan::scan_loras,
@@ -144,6 +145,7 @@ pub fn run() {
             prompt::list_models,
             prompt::chat_completion,
             // git / plugins
+            gitops::plugin_check,
             gitops::plugin_update,
             gitops::plugin_status,
         ])

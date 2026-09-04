@@ -26,6 +26,7 @@ export default function PluginsPage() {
   const [showLogs, setShowLogs] = useState(false);
   const [armDeletePath, setArmDeletePath] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [checkingAll, setCheckingAll] = useState(false);
 
   const deleteOne = async (p: GitStatus) => {
     setDeleting(true);
@@ -104,6 +105,28 @@ export default function PluginsPage() {
     });
   };
 
+  /** 仅联网检查（fetch 不更新），刷新真实 behind 状态 */
+  const checkOne = async (p: GitStatus) => {
+    setUpdating((u) => ({ ...u, [p.path]: true }));
+    setShowLogs(true);
+    log(`$ git -C ${p.name} fetch`, "cmd");
+    try {
+      const st = await api.pluginCheck(p.path);
+      setPlugins((ps) => ps.map((x) => (x.path === p.path ? st : x)));
+      if (st.behind > 0) {
+        log(`⚠ ${p.name} 可更新：落后 ${st.behind} 个提交`, "warn");
+        toast(`${p.name} 可更新（落后 ${st.behind} 个提交）`, "info");
+      } else {
+        log(`✓ ${p.name} 已是最新`, "ok");
+      }
+    } catch (e) {
+      log(`✗ ${p.name} 检查失败: ${e}`, "err");
+      toast(`${p.name} 检查失败`, "err");
+    } finally {
+      setUpdating((u) => ({ ...u, [p.path]: false }));
+    }
+  };
+
   const updateOne = async (p: GitStatus) => {
     setUpdating((u) => ({ ...u, [p.path]: true }));
     setShowLogs(true);
@@ -111,8 +134,13 @@ export default function PluginsPage() {
     try {
       const st = await api.pluginUpdate(p.path);
       setPlugins((ps) => ps.map((x) => (x.path === p.path ? st : x)));
-      log(`✓ ${p.name} 更新完成 → ${st.status}`, "ok");
-      toast(`${p.name} 更新完成`, "ok");
+      if (st.status === "up-to-date") {
+        log(`✓ ${p.name} 已是最新`, "ok");
+        toast(`${p.name} 已是最新`, "ok");
+      } else {
+        log(`✓ ${p.name} 更新完成 → ${st.status}`, "ok");
+        toast(`${p.name} 更新完成`, "ok");
+      }
     } catch (e) {
       log(`✗ ${p.name} 更新失败: ${e}`, "err");
       toast(`${p.name} 更新失败`, "err");
@@ -126,6 +154,20 @@ export default function PluginsPage() {
     for (const t of targets) {
       await updateOne(t);
     }
+  };
+
+  // 一键检查更新：逐个联网 fetch（不动本地代码），刷新真实状态，是否更新由用户决定
+  const checkAll = async () => {
+    const targets = plugins.filter((p) => p.has_remote);
+    if (!targets.length) return;
+    setCheckingAll(true);
+    setShowLogs(true);
+    log(`$ 一键检查更新：${targets.length} 个插件（仅 fetch，不更新本地）`, "cmd");
+    for (const t of targets) {
+      await checkOne(t);
+    }
+    log(`✓ 一键检查更新完成`, "ok");
+    setCheckingAll(false);
   };
 
   const toggleSelect = (path: string) => {
@@ -152,11 +194,19 @@ export default function PluginsPage() {
           <button className="btn btn-line btn-sm" onClick={() => setShowLogs((s) => !s)}>
             🕘 日志
           </button>
+          <button
+            className="btn btn-soft btn-sm btn-primary"
+            onClick={checkAll}
+            disabled={checkingAll || loading || plugins.every((p) => !p.has_remote)}
+            title="逐个联网检查全部插件，有新版本直接更新（冲突项跳过）"
+          >
+            {checkingAll ? "检查中…" : "⤓ 一键检查更新"}
+          </button>
+          <button className="btn btn-line btn-sm" onClick={updateSelected} disabled={selUpdatable === 0}>
+            ⤓ 更新选中 ({selUpdatable})
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={rescan} disabled={loading || !activeDir}>
             {loading ? "扫描中…" : "⟳ 扫描"}
-          </button>
-          <button className="btn btn-soft btn-sm btn-primary" onClick={updateSelected} disabled={selUpdatable === 0}>
-            ⤓ 更新选中 ({selUpdatable})
           </button>
         </div>
       </div>
@@ -248,8 +298,17 @@ export default function PluginsPage() {
                       <div className="row-ops">
                         <button
                           className="btn btn-line btn-sm"
+                          onClick={() => checkOne(p)}
+                          disabled={!p.has_remote || updating[p.path]}
+                          title="联网检查远程是否有新版本（不改动本地代码）"
+                        >
+                          {updating[p.path] ? "…" : "检查"}
+                        </button>
+                        <button
+                          className="btn btn-line btn-sm"
                           onClick={() => updateOne(p)}
                           disabled={p.status !== "behind" || updating[p.path]}
+                          title={p.status === "behind" ? `拉取并更新（落后 ${p.behind} 个提交）` : "检查后若有新版本可更新"}
                         >
                           {updating[p.path] ? "更新中…" : "更新"}
                         </button>

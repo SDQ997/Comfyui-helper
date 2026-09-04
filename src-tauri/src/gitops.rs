@@ -89,6 +89,45 @@ pub fn plugin_status(path: String) -> Result<GitStatus, String> {
     repo_status(&repo)
 }
 
+/// 拉取远程分支到本地 tracking ref（fetch only，不动工作区）。proxy auto：跟随 git config 的
+/// http.proxy 与环境变量，与命令行 git 行为一致（否则 libgit2 直连 GitHub 可能失败）。
+fn fetch_remote(repo: &Repository, branch: &str) -> Result<(), String> {
+    let mut remote = repo
+        .find_remote("origin")
+        .map_err(|e| format!("no origin remote: {}", e))?;
+    let mut fo = FetchOptions::new();
+    let mut po = git2::ProxyOptions::new();
+    po.auto();
+    fo.proxy_options(po);
+    remote
+        .fetch(
+            &[&format!("refs/heads/{}:refs/remotes/origin/{}", branch, branch)],
+            Some(&mut fo),
+            None,
+        )
+        .map_err(|e| {
+            format!(
+                "fetch failed: {}（可能是网络问题：直连 GitHub 失败，可在 git config 设置 http.proxy 后重试）",
+                e
+            )
+        })
+}
+
+/// 仅联网检查：fetch 远程但不合并/更新本地，返回真实 ahead/behind 状态
+#[tauri::command]
+pub async fn plugin_check(path: String) -> Result<GitStatus, String> {
+    let path_cloned = path.clone();
+    tokio::task::spawn_blocking(move || -> Result<GitStatus, String> {
+        let repo = Repository::open(&path_cloned).map_err(|e| e.to_string())?;
+        let head = repo.head().map_err(|e| e.to_string())?;
+        let branch = head.shorthand().unwrap_or("main").to_string();
+        fetch_remote(&repo, &branch)?;
+        repo_status(&repo)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn plugin_update(path: String) -> Result<GitStatus, String> {
     // git2 是同步库，放到阻塞线程执行
@@ -98,15 +137,8 @@ pub async fn plugin_update(path: String) -> Result<GitStatus, String> {
         let head = repo.head().map_err(|e| e.to_string())?;
         let branch = head.shorthand().unwrap_or("main").to_string();
 
-        let mut remote = repo
-            .find_remote("origin")
-            .map_err(|e| format!("no origin remote: {}", e))?;
-
         // fetch（匿名；私有仓库不支持，ComfyUI 插件均为公开仓库）
-        let mut fo = FetchOptions::new();
-        remote
-            .fetch(&[&format!("refs/heads/{}:refs/remotes/origin/{}", branch, branch)], Some(&mut fo), None)
-            .map_err(|e| format!("fetch failed: {}", e))?;
+        fetch_remote(&repo, &branch)?;
 
         // 尝试 fast-forward 到 origin/branch
         let tracking_ref = repo

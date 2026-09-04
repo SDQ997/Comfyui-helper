@@ -111,6 +111,19 @@ export default function VideoPage() {
   // 视频结束时更新 playing 状态（两端都结束后）
   const onEnded = () => setPlaying(false);
 
+  // 播放中：时间轴跟随视频进度（videoA 为主时钟）
+  useEffect(() => {
+    if (!playing) return;
+    let raf = 0;
+    const tick = () => {
+      const v = videoARef.current ?? videoBRef.current;
+      if (v && v.duration > 0) setTime(Math.min(v.currentTime, v.duration));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing]);
+
   const onPointer = (clientX: number) => {
     const el = wrapRef.current;
     if (!el) return;

@@ -12,7 +12,7 @@ import LogsPage from "./pages/LogsPage";
 import DonatePage from "./pages/DonatePage";
 
 const NAV: { key: string; ico: string; label: string }[] = [
-  { key: "prompt", ico: "✦", label: "提示词助手" },
+  { key: "prompt", ico: "✦", label: "AI润色" },
   { key: "h3", ico: "◈", label: "MiniMax 助手" },
   { key: "assets", ico: "▦", label: "资产管理" },
   { key: "lora", ico: "✓", label: "LoRA 管理" },

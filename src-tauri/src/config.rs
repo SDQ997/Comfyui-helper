@@ -178,3 +178,13 @@ pub fn read_text_file(path: String) -> Result<String, String> {
     }
     std::fs::read_to_string(&path).map_err(|e| format!("读取失败: {e}"))
 }
+
+/// 写出 UTF-8 文本文件（用于导出配置备份）
+#[tauri::command]
+pub fn write_text_file(path: String, content: String) -> Result<(), String> {
+    log::info!("write_text_file: {path}");
+    if content.len() > 8 * 1024 * 1024 {
+        return Err("内容超过 8MB，拒绝写出".into());
+    }
+    std::fs::write(&path, content.as_bytes()).map_err(|e| format!("写出失败: {e}"))
+}
