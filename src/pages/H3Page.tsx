@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import Md from "../components/Md";
 import { useStore, H3Asset, H3HistoryEntry, H3Mode } from "../store";
 import { api, ChatMessage } from "../api";
 import { buildH3System, h3ParamPrefix } from "../h3";
@@ -87,7 +88,7 @@ function H3HistoryItem({ item }: { item: H3HistoryEntry }) {
               <span>生成内容</span>
               <button className="ph-copy" onClick={() => copy(item.output, "生成内容 ")}>📋 复制</button>
             </div>
-            <div className="ph-sec-b mono out">{item.output}</div>
+            <div className="ph-sec-b out"><Md text={item.output} /></div>
           </div>
 
           <div className="ph-ops">
@@ -540,7 +541,7 @@ export default function H3Page() {
           <span className="h-meta">{draft.output ? `${draft.output.length} 字符` : "等待生成"}</span>
         </h3>
         <div className={`out-box ${draft.output ? "" : "empty-out"}`}>
-          {draft.output || "// 填写需求并点击生成，H3 结构化提示词将显示在这里…"}
+          {draft.output ? <Md text={draft.output} /> : "// 填写需求并点击生成，H3 结构化提示词将显示在这里…"}
         </div>
       </div>
       <div className="set-row" style={{ justifyContent: "flex-end", marginBottom: 14 }}>

@@ -123,6 +123,21 @@ export const api = {
   moveFile: (src: string, destDir: string) => invoke<string>("move_file", { src, destDir }),
   // 工作流 ↔ 模型联动
   extractModelRefs: (paths: string[]) => invoke<string[]>("extract_model_refs", { paths }),
+
+  // ── ComfyUI 实时监控 ──
+  comfyuiRawLogs: (base: string) => invoke<{ t: string; m: string }[]>("comfyui_raw_logs", { base }),
+  comfyuiHistoryErrors: (base: string) =>
+    invoke<
+      {
+        prompt_id: string;
+        node_type: string;
+        node_id: string;
+        exception_type: string;
+        exception_message: string;
+        traceback: string[];
+        node_inputs: { name: string; value: string }[];
+      }[]
+    >("comfyui_history_errors", { base }),
   pluginStatus: (path: string) => invoke<GitStatus>("plugin_status", { path }),
   pluginCheck: (path: string) => invoke<GitStatus>("plugin_check", { path }),
   pluginClone: (url: string, destParent: string) => invoke<string>("plugin_clone", { url, destParent }),

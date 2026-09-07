@@ -11,6 +11,7 @@ import PluginsPage from "./pages/PluginsPage";
 import VideoPage from "./pages/VideoPage";
 import SettingsPage from "./pages/SettingsPage";
 import LogsPage from "./pages/LogsPage";
+import ComfyMonitorPage from "./pages/ComfyMonitorPage";
 import DonatePage from "./pages/DonatePage";
 
 const NAV: { key: string; ico: string; label: string }[] = [
@@ -23,6 +24,7 @@ const NAV: { key: string; ico: string; label: string }[] = [
   { key: "plugins", ico: "⚙", label: "插件管理" },
   { key: "video", ico: "◐", label: "视频分析" },
   { key: "logs", ico: "☰", label: "日志" },
+  { key: "monitor", ico: "◉", label: "ComfyUI 监控" },
   { key: "settings", ico: "🔧", label: "设置" },
 ];
 
@@ -174,6 +176,7 @@ export default function App() {
           {page === "plugins" && <PluginsPage />}
           {page === "video" && <VideoPage />}
           {page === "logs" && <LogsPage />}
+          {page === "monitor" && <ComfyMonitorPage />}
           {page === "settings" && <SettingsPage />}
           {page === "donate" && <DonatePage />}
         </div>

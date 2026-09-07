@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import Md from "../components/Md";
 import { useStore, PromptHistoryEntry } from "../store";
 import { api, ChatMessage } from "../api";
 
@@ -73,7 +74,7 @@ function HistoryItem({ item }: { item: PromptHistoryEntry }) {
                 📋 复制
               </button>
             </div>
-            <div className="ph-sec-b mono out">{item.output}</div>
+            <div className="ph-sec-b out"><Md text={item.output} /></div>
           </div>
 
           <div className="ph-ops">
@@ -426,7 +427,7 @@ export default function PromptPage() {
               <span className="h-meta">{output ? `${output.length} 字符` : "等待生成"}</span>
             </h3>
             <div className={`out-box ${output ? "" : "empty-out"}`}>
-              {output || "// 点击「生成提示词」开始，AI 润色结果将显示在这里…"}
+              {output ? <Md text={output} /> : "// 点击「生成提示词」开始，AI 润色结果将显示在这里…"}
             </div>
           </div>
           <div className="set-row" style={{ justifyContent: "flex-end" }}>

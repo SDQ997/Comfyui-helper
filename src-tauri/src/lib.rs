@@ -1,3 +1,4 @@
+mod comfymonitor;
 mod config;
 mod ffmpeg;
 mod fsops;
@@ -130,6 +131,8 @@ pub fn run() {
             fsops::move_dir_into,
             fsops::move_file,
             links::extract_model_refs,
+            comfymonitor::comfyui_raw_logs,
+            comfymonitor::comfyui_history_errors,
             // lora trigger words
             lora::read_trigger_words,
             lora::write_trigger_words,
