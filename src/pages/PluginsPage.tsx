@@ -25,11 +25,9 @@ export default function PluginsPage() {
   const [logs, setLogs] = useState<{ text: string; cls: string }[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [armDeletePath, setArmDeletePath] = useState("");
-  const [deleting, setDeleting] = useState(false);
   const [checkingAll, setCheckingAll] = useState(false);
 
   const deleteOne = async (p: GitStatus) => {
-    setDeleting(true);
     try {
       await api.deletePlugin(p.path);
       toast(`已删除插件 ${p.name}（进回收站）`, "ok");
@@ -38,8 +36,6 @@ export default function PluginsPage() {
     } catch (e) {
       toast(`删除失败: ${e}`, "err");
       log(`✗ ${p.name} 删除失败: ${e}`, "err");
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -54,15 +50,17 @@ export default function PluginsPage() {
     setLoading(true);
     try {
       const base = await api.scanPlugins(activeDir);
-      // 逐个取 git 状态
+      // 逐个取 git 状态（携带 scan 得到的 requirements 标记）
       const st: GitStatus[] = [];
       for (const p of base) {
         try {
-          st.push(await api.pluginStatus(p.path));
+          const s = await api.pluginStatus(p.path);
+          st.push({ ...s, has_requirements: p.has_requirements });
         } catch {
           st.push({
             path: p.path, name: p.name, branch: "-", status: "error",
             behind: 0, ahead: 0, last_commit: "", last_commit_msg: "", has_remote: false,
+            has_requirements: p.has_requirements,
           });
         }
       }
@@ -170,6 +168,67 @@ export default function PluginsPage() {
     setCheckingAll(false);
   };
 
+  // ── 添加插件 ──
+  const [showAdd, setShowAdd] = useState(false);
+  const [cloneUrl, setCloneUrl] = useState("");
+  const [cloning, setCloning] = useState(false);
+
+  // git URL 克隆到当前目录
+  const clonePlugin = async () => {
+    if (!activeDir || !cloneUrl.trim()) return;
+    setCloning(true);
+    setShowLogs(true);
+    log(`$ git clone ${cloneUrl.trim()}`, "cmd");
+    try {
+      const dest = await api.pluginClone(cloneUrl.trim(), activeDir);
+      log(`✓ 已克隆到 ${dest}`, "ok");
+      toast(`插件已克隆：${dest.split(/[\\/]/).pop()}`, "ok");
+      setShowAdd(false);
+      setCloneUrl("");
+      await rescan();
+    } catch (e) {
+      log(`✗ 克隆失败: ${e}`, "err");
+      toast(`克隆失败: ${e}`, "err");
+    } finally {
+      setCloning(false);
+    }
+  };
+
+  // 已有文件夹移入 custom_nodes
+  const addExistingFolder = async () => {
+    if (!activeDir) return;
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const sel = await open({ directory: true, multiple: false });
+    if (typeof sel !== "string") return;
+    try {
+      const dest = await api.moveDirInto(sel, activeDir);
+      log(`✓ 已移入 ${dest}`, "ok");
+      toast("插件文件夹已移入", "ok");
+      await rescan();
+    } catch (e) {
+      toast(`移入失败: ${e}`, "err");
+    }
+  };
+
+  // 安装插件依赖（pip install -r requirements.txt，用设置里的 ComfyUI python）
+  const installDeps = async (p: GitStatus) => {
+    const py = config?.general?.comfyui_python ?? "";
+    setShowLogs(true);
+    setUpdating((u) => ({ ...u, [p.path]: true }));
+    log(`$ pip install -r ${p.name}/requirements.txt`, "cmd");
+    try {
+      const out = await api.pluginInstallDeps(p.path, py);
+      log(`✓ ${p.name} 依赖安装完成`, "ok");
+      for (const line of out.trim().split("\n").slice(-8)) log(line);
+      toast(`${p.name} 依赖安装完成`, "ok");
+    } catch (e) {
+      log(`✗ ${p.name} 依赖安装失败: ${e}`, "err");
+      toast(`${p.name} 依赖安装失败（详见日志）`, "err");
+    } finally {
+      setUpdating((u) => ({ ...u, [p.path]: false }));
+    }
+  };
+
   const toggleSelect = (path: string) => {
     setSelected((s) => {
       const n = new Set(s);
@@ -188,17 +247,20 @@ export default function PluginsPage() {
           <h1>
             插件管理 <span className="tag cyan">{plugins.length} 个</span>
           </h1>
-          <div className="desc">扫描 custom_nodes 中的 git 仓库；批量更新、状态追踪、操作日志。</div>
+          <div className="desc">扫描 custom_nodes 中的 git 仓库；勾选批量更新、单插件检查 / 更新 / 装依赖 / 删除；所有操作进日志。</div>
         </div>
         <div className="right">
           <button className="btn btn-line btn-sm" onClick={() => setShowLogs((s) => !s)}>
             🕘 日志
           </button>
+          <button className="btn btn-line btn-sm" onClick={() => setShowAdd(true)} disabled={!activeDir} title="git 克隆或移入已有插件文件夹">
+            ＋ 添加插件
+          </button>
           <button
             className="btn btn-soft btn-sm btn-primary"
             onClick={checkAll}
             disabled={checkingAll || loading || plugins.every((p) => !p.has_remote)}
-            title="逐个联网检查全部插件，有新版本直接更新（冲突项跳过）"
+            title="逐个联网检查全部插件（仅 fetch，不动本地代码），是否更新由用户决定"
           >
             {checkingAll ? "检查中…" : "⤓ 一键检查更新"}
           </button>
@@ -235,9 +297,7 @@ export default function PluginsPage() {
           <span style={{ fontSize: 11, color: "var(--tx-3)", fontFamily: "var(--f-mono)" }}>
             已选 {selected.size} / {plugins.length}
           </span>
-          <button className="btn btn-line btn-sm" onClick={() => setSelected(new Set(plugins.map((p) => p.path)))}>
-            全选
-          </button>
+          <button className="btn btn-line btn-sm" onClick={() => setSelected(new Set(plugins.map((p) => p.path)))}>全选</button>
           <button
             className="btn btn-line btn-sm"
             onClick={() => setSelected(new Set(plugins.filter((p) => p.status === "behind").map((p) => p.path)))}
@@ -254,89 +314,122 @@ export default function PluginsPage() {
           <div className="tip">请先点击「＋ 添加目录」选择 ComfyUI 的 custom_nodes 目录。</div>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: "auto", flex: 1 }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th style={{ width: 36 }}></th>
-                <th>项目</th>
-                <th style={{ width: 100 }}>状态</th>
-                <th style={{ width: 110 }}>分支</th>
-                <th style={{ width: 120 }}>领先 / 落后</th>
-                <th style={{ width: 150 }}>最后提交</th>
-                <th style={{ width: 170 }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => {
-                const s = STATUS_LABEL[p.status] ?? STATUS_LABEL.unknown;
-                return (
-                  <tr key={p.path}>
-                    <td>
-                      <input type="checkbox" checked={selected.has(p.path)} onChange={() => toggleSelect(p.path)} />
-                    </td>
-                    <td>
-                      <div className="name">{p.name}</div>
-                      <div className="mono" style={{ fontSize: 10, color: "var(--tx-4)" }}>{p.path}</div>
-                    </td>
-                    <td>
-                      <span className={`pill ${s.cls}`}>
-                        <i className="d" />
-                        {s.label}
+        <div className="flow-stack" style={{ overflow: "auto", flex: 1, minHeight: 0, paddingBottom: 4 }}>
+          {filtered.map((p) => {
+            const s = STATUS_LABEL[p.status] ?? STATUS_LABEL.unknown;
+            const armed = armDeletePath === p.path;
+            return (
+              <div key={p.path} className={`fc ${selected.has(p.path) ? "open" : ""}`}>
+                <div className="fc-h" style={{ cursor: "default" }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.path)}
+                    onChange={() => toggleSelect(p.path)}
+                    style={{ accentColor: "var(--c-cyan)", flex: "none" }}
+                  />
+                  <span className="fico">⚙</span>
+                  <span className="fname">{p.name}</span>
+                  <span className="fpath">{p.branch} · {p.last_commit}</span>
+                  <div className="meta">
+                    <span className={`pill ${s.cls}`}>
+                      <i className="d" />
+                      {s.label}
+                    </span>
+                    {(p.ahead > 0 || p.behind > 0) && (
+                      <span className="badge">
+                        +{p.ahead} / -{p.behind}
                       </span>
-                    </td>
-                    <td className="mono">{p.branch}</td>
-                    <td className="mono">
-                      <span style={{ color: p.ahead > 0 ? "var(--c-cyan)" : "inherit" }}>+{p.ahead}</span>
-                      {" / "}
-                      <span style={{ color: p.behind > 0 ? "var(--c-amber)" : "inherit" }}>-{p.behind}</span>
-                    </td>
-                    <td className="mono" title={p.last_commit_msg}>
-                      {p.last_commit}
-                    </td>
-                    <td>
-                      <div className="row-ops">
-                        <button
-                          className="btn btn-line btn-sm"
-                          onClick={() => checkOne(p)}
-                          disabled={!p.has_remote || updating[p.path]}
-                          title="联网检查远程是否有新版本（不改动本地代码）"
-                        >
-                          {updating[p.path] ? "…" : "检查"}
-                        </button>
-                        <button
-                          className="btn btn-line btn-sm"
-                          onClick={() => updateOne(p)}
-                          disabled={p.status !== "behind" || updating[p.path]}
-                          title={p.status === "behind" ? `拉取并更新（落后 ${p.behind} 个提交）` : "检查后若有新版本可更新"}
-                        >
-                          {updating[p.path] ? "更新中…" : "更新"}
-                        </button>
-                        <button
-                          className={`btn btn-sm btn-danger ${armDeletePath === p.path ? "armed" : "btn-danger-soft"}`}
-                          disabled={deleting}
-                          onClick={() => {
-                            if (armDeletePath !== p.path) {
-                              setArmDeletePath(p.path);
-                              setTimeout(() => {
-                                setArmDeletePath((cur) => (cur === p.path ? "" : cur));
-                              }, 3500);
-                              return;
-                            }
-                            setArmDeletePath("");
-                            void deleteOne(p);
-                          }}
-                          title="删除插件文件夹（进回收站）"
-                        >
-                          {armDeletePath === p.path ? "确认删除？" : "🗑"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+                  <div className="h-ops">
+                    <span
+                      className="op"
+                      onClick={() => void checkOne(p)}
+                      style={{ opacity: !p.has_remote || updating[p.path] ? 0.4 : 1 }}
+                      title="联网检查远程是否有新版本（不改动本地代码）"
+                    >
+                      {updating[p.path] ? "…" : "检查"}
+                    </span>
+                    <span
+                      className="op"
+                      onClick={() => void updateOne(p)}
+                      style={{ opacity: p.status !== "behind" || updating[p.path] ? 0.4 : 1 }}
+                      title={p.status === "behind" ? `拉取并更新（落后 ${p.behind} 个提交）` : "检查后若有新版本可更新"}
+                    >
+                      {updating[p.path] ? "更新中…" : "更新"}
+                    </span>
+                    {p.has_requirements && (
+                      <span
+                        className="op"
+                        onClick={() => void installDeps(p)}
+                        style={{ opacity: updating[p.path] ? 0.4 : 1 }}
+                        title="用 ComfyUI Python 执行 pip install -r requirements.txt（Python 路径在 设置 → 通用 配置）"
+                      >
+                        {updating[p.path] ? "…" : "装依赖"}
+                      </span>
+                    )}
+                    <span
+                      className={`op del ${armed ? "armed" : ""}`}
+                      onClick={() => {
+                        if (!armed) {
+                          setArmDeletePath(p.path);
+                          setTimeout(() => setArmDeletePath((cur) => (cur === p.path ? "" : cur)), 3500);
+                          return;
+                        }
+                        setArmDeletePath("");
+                        void deleteOne(p);
+                      }}
+                      title="删除插件文件夹（进回收站）"
+                    >
+                      {armed ? "确认删除？" : "🗑 删除"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="empty card">
+              <div className="big">⚙</div>
+              <div className="tip">没有符合条件的插件。</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="modal-mask" onClick={() => !cloning && setShowAdd(false)}>
+          <div className="modal" style={{ width: 520 }} onClick={(e) => e.stopPropagation()}>
+            <h3>添加插件</h3>
+            <div className="desc" style={{ marginBottom: 12 }}>
+              目标目录：{activeDir}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <div className="input" style={{ flex: 1 }}>
+                <input
+                  placeholder="https://github.com/xxx/ComfyUI-Plugin.git"
+                  value={cloneUrl}
+                  onChange={(e) => setCloneUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void clonePlugin()}
+                  autoFocus
+                />
+              </div>
+              <button className="btn btn-soft btn-sm btn-primary" onClick={clonePlugin} disabled={cloning || !cloneUrl.trim()}>
+                {cloning ? "克隆中…" : "克隆安装"}
+              </button>
+            </div>
+            <div className="hint" style={{ marginBottom: 14 }}>
+              公开仓库匿名克隆到 custom_nodes 下；克隆后可点「装依赖」安装 requirements.txt。
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn btn-line btn-sm" onClick={addExistingFolder} disabled={cloning}>
+                📁 移入已有文件夹
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowAdd(false)} disabled={cloning}>
+                取消
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

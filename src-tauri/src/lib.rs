@@ -1,6 +1,8 @@
 mod config;
 mod ffmpeg;
+mod fsops;
 mod gitops;
+mod links;
 mod lora;
 mod logging;
 mod media;
@@ -121,6 +123,13 @@ pub fn run() {
             scan::scan_loras,
             scan::scan_plugins,
             scan::list_directory_tree,
+            scan::scan_files,
+            scan::list_subdirs,
+            fsops::copy_files_in,
+            fsops::create_subdir,
+            fsops::move_dir_into,
+            fsops::move_file,
+            links::extract_model_refs,
             // lora trigger words
             lora::read_trigger_words,
             lora::write_trigger_words,
@@ -141,6 +150,7 @@ pub fn run() {
             media::delete_asset,
             media::delete_lora,
             media::delete_plugin,
+            media::delete_any,
             // prompt assistant
             prompt::list_models,
             prompt::chat_completion,
@@ -148,6 +158,8 @@ pub fn run() {
             gitops::plugin_check,
             gitops::plugin_update,
             gitops::plugin_status,
+            gitops::plugin_clone,
+            gitops::plugin_install_deps,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

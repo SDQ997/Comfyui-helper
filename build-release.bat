@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM  ComfyUI Helper - Build Script (Windows)
-REM  Output:  release\ComfyUI Helper_0.1.0_x64-setup.exe  (installer)
+REM  Output:  release\ComfyUI Helper_<version>_x64-setup.exe (installer)
 REM           release\comfyui-helper.exe                  (portable)
 REM  Usage:   Double-click, or run from project root.
 REM  Note:    This file is intentionally ASCII-only. Do NOT save
@@ -187,6 +187,12 @@ set CODEBUDDY_SAFE_DELETE_BULK_GUARD=
 set CODEBUDDY_SAFE_DELETE_SANDBOX=
 set CODEBUDDY_SAFE_DELETE_BIN_DIR=
 
+REM Clean stale NSIS bundles from previous builds (old-version installers
+REM would otherwise be re-copied into release\ below).
+if exist "src-tauri\target\release\bundle\nsis" rmdir /s /q "src-tauri\target\release\bundle\nsis"
+echo [OK] Stale NSIS bundle dir cleaned.
+echo.
+
 call npx tauri build
 if errorlevel 1 (
     echo [ERROR] tauri build failed. Scroll up for the Rust error.
@@ -197,6 +203,7 @@ echo.
 REM ---------- Step 4: collect artifacts ----------
 echo [5/6] Collecting artifacts into release\...
 if not exist "release" mkdir "release"
+del /q "release\*_x64-setup.exe" 2>nul
 if exist "src-tauri\target\release\comfyui-helper.exe" (
     copy /y "src-tauri\target\release\comfyui-helper.exe" "release\" >nul
     echo [OK] comfyui-helper.exe
@@ -216,7 +223,7 @@ echo.
 echo [6/6] BUILD SUCCEEDED
 echo.
 echo   Artifacts in: %CD%\release
-echo   - Installer : ComfyUI Helper_0.1.0_x64-setup.exe
+echo   - Installer : ComfyUI Helper_<version>_x64-setup.exe
 echo   - Portable  : comfyui-helper.exe
 echo.
 echo   Runtime log : [exe dir]\logs\app.log

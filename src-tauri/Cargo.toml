@@ -1,6 +1,6 @@
 [package]
 name = "comfyui-helper"
-version = "0.1.0"
+version = "0.4.1"
 description = "Lightweight ComfyUI assistant - prompt, assets, LoRA, plugins, video analysis"
 authors = ["ComfyUI Helper Contributors"]
 license = "MIT"

@@ -292,3 +292,33 @@ pub fn delete_plugin(dir: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// 通用删除（文件或目录）→ 移入回收站，失败回退直接删除。
+/// 供工作流 / 模型管理等页使用；护栏：拒绝删除盘符根目录。
+#[tauri::command]
+pub fn delete_any(path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("路径不存在: {path}"));
+    }
+    // 护栏：必须是具体路径（有文件名部分），防止误删盘根
+    if p.parent().map(|par| par.as_os_str().is_empty()).unwrap_or(true) {
+        return Err("拒绝删除根目录".into());
+    }
+    log::info!("delete_any: {path}");
+    let is_dir = p.is_dir();
+    let ok = if is_dir {
+        send_to_recycle_dir(&p)
+    } else {
+        send_to_recycle_bin(&p)
+    };
+    if !ok {
+        log::warn!("回收站失败，尝试直接删除: {path}");
+        if is_dir {
+            std::fs::remove_dir_all(&p).map_err(|e| format!("删除失败: {e}"))?;
+        } else {
+            std::fs::remove_file(&p).map_err(|e| format!("删除失败: {e}"))?;
+        }
+    }
+    Ok(())
+}

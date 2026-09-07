@@ -1,3 +1,4 @@
+import { version as APP_VERSION } from "../../package.json";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import { api, AppConfig } from "../api";
@@ -434,6 +435,8 @@ export default function SettingsPage() {
               <DirList kind="assets" label="资产目录" hint="递归扫描视频 / 图片 / 文本 / 音频" />
               <DirList kind="loras" label="LoRA 目录" hint="扫描 .safetensors / .pt，触发词读取同名 .txt" />
               <DirList kind="plugins" label="插件目录" hint="即 ComfyUI 的 custom_nodes 目录，可为多个 ComfyUI 安装分别配置" />
+              <DirList kind="workflows" label="工作流目录" hint="推荐 ComfyUI 的 user/default/workflows，多级目录分组与 ComfyUI 端一致" />
+              <DirList kind="models" label="模型目录" hint="即 ComfyUI 的 models 根目录，一级子目录自动识别为分类" />
               <div className="set-divider" />
               <div className="hint">数据目录（config.toml 所在）：{dataDir}</div>
             </div>
@@ -588,6 +591,39 @@ export default function SettingsPage() {
                   </label>
                 </div>
               </div>
+              <div className="set-field">
+                <div className="lbl">ComfyUI Python 路径</div>
+                <div className="v">
+                  <div className="set-row">
+                    <div className="input" style={{ flex: 1 }}>
+                      <input
+                        style={{ fontFamily: "var(--f-mono)" }}
+                        placeholder="例如 D:\\Ai\\comfyui\\...\\python\\python.exe"
+                        value={cfg.general.comfyui_python ?? ""}
+                        onChange={(e) => patchDraft({ general: { ...cfg.general, comfyui_python: e.target.value } })}
+                      />
+                    </div>
+                    <button
+                      className="btn btn-line btn-sm"
+                      onClick={async () => {
+                        const { open } = await import("@tauri-apps/plugin-dialog");
+                        const sel = await open({
+                          multiple: false,
+                          filters: [{ name: "python", extensions: ["exe"] }],
+                        });
+                        if (typeof sel === "string") {
+                          patchDraft({ general: { ...cfg.general, comfyui_python: sel } });
+                        }
+                      }}
+                    >
+                      浏览
+                    </button>
+                  </div>
+                  <div className="hint">
+                    插件管理「装依赖」用这个 python 执行 pip install -r requirements.txt。嵌入式/独立环境均可，选到 python.exe 即可。
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -724,7 +760,7 @@ export default function SettingsPage() {
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>ComfyUI Helper</div>
                   <div style={{ fontSize: 11.5, color: "var(--tx-3)", fontFamily: "var(--f-mono)", marginTop: 2 }}>
-                    v0.1.0 · MIT License · 轻量 ComfyUI 桌面助手
+                    v{APP_VERSION} · MIT License · 轻量 ComfyUI 桌面助手
                   </div>
                 </div>
               </div>

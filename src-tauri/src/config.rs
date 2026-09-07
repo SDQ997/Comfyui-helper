@@ -54,6 +54,9 @@ pub struct GeneralSettings {
     pub generate_thumbnails: bool,
     pub hide_unmarked_assets: bool,
     pub theme: String,
+    /// ComfyUI 的 python.exe 路径（插件依赖安装用；serde default 兼容旧配置）
+    #[serde(default)]
+    pub comfyui_python: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -125,6 +128,7 @@ impl AppConfig {
                 generate_thumbnails: true,
                 hide_unmarked_assets: false,
                 theme: "dark".into(),
+                comfyui_python: String::new(),
             },
             donate: DonateConfig {
                 show_donate_entry: true,

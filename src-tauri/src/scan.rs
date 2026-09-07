@@ -23,6 +23,10 @@ pub struct AssetEntry {
 pub struct LoraEntry {
     pub path: String,
     pub name: String,
+    /// 所属扫描根目录（用于前端面包屑定位）
+    pub root: String,
+    /// 相对根目录的子目录（"" = 根目录本身，"a\b" 或 "a/b" 风格统一为 "/"）
+    pub rel_dir: String,
     pub size: u64,
     pub modified: i64,
     /// 同目录同名 txt 是否存在
@@ -41,6 +45,26 @@ pub struct PluginEntry {
     pub last_commit: String,
     pub last_commit_msg: String,
     pub has_remote: bool,
+    /// 插件目录是否含 requirements.txt（可执行依赖安装）
+    pub has_requirements: bool,
+}
+
+/// 通用文件条目（工作流 / 模型等管理页共用）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileEntry {
+    pub path: String,
+    pub name: String,
+    pub root: String,
+    pub rel_dir: String,
+    pub size: u64,
+    pub modified: i64,
+}
+
+/// 一级子目录信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirInfo {
+    pub name: String,
+    pub path: String,
 }
 
 fn ext_of(p: &Path) -> String {
@@ -145,10 +169,18 @@ pub fn scan_loras(dirs: Vec<String>) -> Result<Vec<LoraEntry>, String> {
         if !root.is_dir() {
             continue;
         }
+        let root_s = root.to_string_lossy().into_owned();
         for entry in walkdir::WalkDir::new(&root)
             .follow_links(false)
-            .max_depth(4)
+            .max_depth(8)
             .into_iter()
+            .filter_entry(|e| {
+                if e.depth() == 0 {
+                    return true;
+                }
+                let name = e.file_name().to_string_lossy();
+                !(name.starts_with('.') || name.starts_with('#'))
+            })
             .filter_map(|e| e.ok())
         {
             if !entry.file_type().is_file() {
@@ -158,6 +190,17 @@ pub fn scan_loras(dirs: Vec<String>) -> Result<Vec<LoraEntry>, String> {
             if !LORA_EXTS.contains(&ext.as_str()) {
                 continue;
             }
+            let rel_dir = entry
+                .path()
+                .parent()
+                .and_then(|p| p.strip_prefix(&root).ok())
+                .map(|p| {
+                    p.components()
+                        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                        .collect::<Vec<_>>()
+                        .join("/")
+                })
+                .unwrap_or_default();
             let meta = entry.metadata().map_err(|e| e.to_string())?;
             let modified = meta
                 .modified()
@@ -184,6 +227,8 @@ pub fn scan_loras(dirs: Vec<String>) -> Result<Vec<LoraEntry>, String> {
                     .file_stem()
                     .map(|s| s.to_string_lossy().into_owned())
                     .unwrap_or_default(),
+                root: root_s.clone(),
+                rel_dir,
                 size: meta.len(),
                 modified,
                 has_txt,
@@ -241,8 +286,102 @@ pub fn scan_plugins(dir: String) -> Result<Vec<PluginEntry>, String> {
                 last_commit: String::new(),
                 last_commit_msg: String::new(),
                 has_remote: false,
+                has_requirements: p.join("requirements.txt").is_file(),
             });
         }
+    }
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(out)
+}
+
+/// 通用文件扫描（工作流 / 模型管理共用）：按扩展名过滤，返回带根目录与相对路径的条目
+#[tauri::command]
+pub fn scan_files(dirs: Vec<String>, exts: Vec<String>) -> Result<Vec<FileEntry>, String> {
+    let ext_set: std::collections::HashSet<String> = exts.iter().map(|s| s.to_lowercase()).collect();
+    let mut out = Vec::new();
+    for dir in &dirs {
+        let root = PathBuf::from(dir);
+        if !root.is_dir() {
+            continue;
+        }
+        let root_s = root.to_string_lossy().into_owned();
+        for entry in walkdir::WalkDir::new(&root)
+            .follow_links(false)
+            .max_depth(8)
+            .into_iter()
+            .filter_entry(|e| {
+                if e.depth() == 0 {
+                    return true;
+                }
+                let name = e.file_name().to_string_lossy();
+                !(name.starts_with('.') || name.starts_with('#'))
+            })
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let ext = ext_of(entry.path());
+            if !ext_set.contains(&ext) {
+                continue;
+            }
+            let meta = entry.metadata().map_err(|e| e.to_string())?;
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            let rel_dir = entry
+                .path()
+                .parent()
+                .and_then(|p| p.strip_prefix(&root).ok())
+                .map(|p| {
+                    p.components()
+                        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                        .collect::<Vec<_>>()
+                        .join("/")
+                })
+                .unwrap_or_default();
+            out.push(FileEntry {
+                path: entry.path().to_string_lossy().into_owned(),
+                name: entry.file_name().to_string_lossy().into_owned(),
+                root: root_s.clone(),
+                rel_dir,
+                size: meta.len(),
+                modified,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(out)
+}
+
+/// 列出指定目录的一级子目录（跳过 . / # 开头），用于分类与文件夹浏览
+#[tauri::command]
+pub fn list_subdirs(path: String) -> Result<Vec<DirInfo>, String> {
+    let root = PathBuf::from(&path);
+    if !root.is_dir() {
+        return Err(format!("not a directory: {path}"));
+    }
+    let mut out = Vec::new();
+    let rd = std::fs::read_dir(&root).map_err(|e| e.to_string())?;
+    for entry in rd.flatten() {
+        let p = entry.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let name = p
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if name.starts_with('.') || name.starts_with('#') {
+            continue;
+        }
+        out.push(DirInfo {
+            name,
+            path: p.to_string_lossy().into_owned(),
+        });
     }
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(out)

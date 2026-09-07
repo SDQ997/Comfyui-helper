@@ -5,6 +5,8 @@ import PromptPage from "./pages/PromptPage";
 import H3Page from "./pages/H3Page";
 import AssetsPage from "./pages/AssetsPage";
 import LoraPage from "./pages/LoraPage";
+import WorkflowsPage from "./pages/WorkflowsPage";
+import ModelsPage from "./pages/ModelsPage";
 import PluginsPage from "./pages/PluginsPage";
 import VideoPage from "./pages/VideoPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -16,6 +18,8 @@ const NAV: { key: string; ico: string; label: string }[] = [
   { key: "h3", ico: "◈", label: "MiniMax 助手" },
   { key: "assets", ico: "▦", label: "资产管理" },
   { key: "lora", ico: "✓", label: "LoRA 管理" },
+  { key: "workflows", ico: "◇", label: "工作流管理" },
+  { key: "models", ico: "◧", label: "模型管理" },
   { key: "plugins", ico: "⚙", label: "插件管理" },
   { key: "video", ico: "◐", label: "视频分析" },
   { key: "logs", ico: "☰", label: "日志" },
@@ -25,6 +29,11 @@ const NAV: { key: string; ico: string; label: string }[] = [
 export default function App() {
   const { page, setPage, config, loadConfig, toasts, dismissToast } = useStore();
   const [maximized, setMaximized] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
+
+  useEffect(() => {
+    import("@tauri-apps/api/app").then(({ getVersion }) => getVersion()).then(setAppVersion).catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadConfig().catch((e) => useStore.getState().toast(`加载配置失败: ${e}`, "err"));
@@ -150,7 +159,7 @@ export default function App() {
         </div>
         <div className="sb-foot">
           <span className="ok">● 就绪</span>
-          <span>v0.1.0</span>
+          <span>{appVersion ? `v${appVersion}` : ""}</span>
         </div>
       </aside>
 
@@ -160,6 +169,8 @@ export default function App() {
           {page === "h3" && <H3Page />}
           {page === "assets" && <AssetsPage />}
           {page === "lora" && <LoraPage />}
+          {page === "workflows" && <WorkflowsPage />}
+          {page === "models" && <ModelsPage />}
           {page === "plugins" && <PluginsPage />}
           {page === "video" && <VideoPage />}
           {page === "logs" && <LogsPage />}

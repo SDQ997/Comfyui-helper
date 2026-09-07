@@ -941,3 +941,136 @@ label { vertical-align: middle; }
 
 /* FL2V 等空槽位说明 */
 .h3-slot-hint { font-size: 10px; color: var(--tx-4); margin-left: 4px; }
+
+/* ───────── 树状目录菜单（LoRA / 工作流 / 模型管理共用） ───────── */
+.split-view {
+  display: flex; gap: 12px; flex: 1; min-height: 0;
+}
+.side-tree {
+  width: 240px; flex: none; display: flex; flex-direction: column;
+  background: var(--bg-2); border: 1px solid var(--line-1); border-radius: var(--r-8, 10px);
+  overflow: hidden;
+}
+.side-tree .dtree { flex: 1; overflow: auto; padding: 6px 4px; }
+.side-tree-foot {
+  border-top: 1px solid var(--line-1); padding: 8px; display: flex; gap: 6px;
+}
+.main-pane {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; min-height: 0;
+}
+.dtree { user-select: none; }
+.dt-row {
+  display: flex; align-items: center; gap: 5px; height: 28px; padding-right: 8px;
+  border-radius: 6px; cursor: pointer; font-size: 12.5px; color: var(--tx-2);
+  transition: background var(--t-fast);
+  white-space: nowrap;
+}
+.dt-row:hover { background: var(--bg-3); }
+.dt-row.sel { background: var(--bg-4); color: var(--tx-1); }
+.dt-row.sel .dt-name { color: var(--c-cyan, #4fd1c5); font-weight: 600; }
+.dt-arrow {
+  width: 14px; flex: none; text-align: center; font-size: 10px; color: var(--tx-4);
+  transition: transform var(--t-fast); display: inline-block;
+}
+.dt-arrow.open { transform: rotate(90deg); }
+.dt-arrow.leaf { visibility: hidden; }
+.dt-ico { flex: none; font-size: 12px; }
+.dt-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.dt-n {
+  flex: none; font-size: 10px; font-family: var(--f-mono); color: var(--tx-4);
+  background: var(--bg-4); border-radius: 8px; padding: 1px 6px;
+}
+.dt-row.sel .dt-n { color: var(--tx-2); }
+.dt-row.dt-file .dt-name { color: var(--tx-3); font-size: 12px; }
+.dt-row.dt-file:hover .dt-name { color: var(--tx-1); }
+.dt-del {
+  flex: none; font-size: 11px; color: var(--tx-4); opacity: 0; cursor: pointer;
+  transition: opacity var(--t-fast); padding: 0 4px; border-radius: 4px;
+}
+.dt-row:hover .dt-del { opacity: 1; }
+.dt-del:hover { color: var(--c-red, #e5615c); background: var(--bg-4); }
+.dt-del.armed {
+  opacity: 1; color: #fff; background: var(--c-red, #e5615c); font-size: 10px;
+  padding: 1px 6px; border-radius: 6px; white-space: nowrap;
+}
+
+/* ───────── 工作流 JSON 预览弹层 ───────── */
+.modal-box {
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r-8);
+  width: 860px; max-width: 94vw; height: 84vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.modal-h {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding: 10px 14px; border-bottom: 1px solid var(--line-1);
+  font-size: 12.5px; font-weight: 600; color: var(--tx-2);
+}
+.json-view {
+  flex: 1; min-height: 0; overflow: auto; margin: 0;
+  padding: 12px 14px; font-size: 11.5px; line-height: 1.55;
+  color: var(--tx-2); white-space: pre; tab-size: 2;
+}
+.dt-row.dragover {
+  background: rgba(79, 209, 197, 0.12);
+  outline: 1px dashed var(--c-cyan-line, rgba(79, 209, 197, 0.5));
+  outline-offset: -1px;
+}
+
+/* ═════════ 折叠卡片流（LoRA/工作流/模型管理统一布局，对齐提示词历史交互） ═════════ */
+.flow-stack { display: flex; flex-direction: column; gap: 8px; }
+.fc { background: var(--bg-2); border: 1px solid var(--line-1); border-radius: var(--r-8); transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+.fc.open { border-color: var(--line-2); }
+.fc.drop { border-color: var(--c-cyan); box-shadow: 0 0 0 1px var(--c-cyan-glow), inset 0 0 24px var(--c-cyan-soft); }
+.fc-h {
+  display: flex; align-items: center; gap: 9px; padding: 10px 14px; cursor: pointer; user-select: none;
+  border-radius: var(--r-8); transition: background var(--t-fast); min-width: 0;
+}
+.fc-h:hover { background: var(--bg-3); }
+.fc-h .arrow { font-size: 10px; color: var(--tx-3); width: 12px; flex: none; transition: transform 140ms ease; }
+.fc.open > .fc-h .arrow { transform: rotate(90deg); }
+.fc-h .fico { flex: none; font-size: 13px; }
+.fc-h .fname { font-size: 13px; font-weight: 600; color: var(--tx-1); flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-h .fpath { font-family: var(--f-mono); font-size: 10px; color: var(--tx-4); flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-h .meta { display: flex; gap: 5px; align-items: center; flex: none; }
+/* 操作按钮常驻占位，悬浮只做淡入淡出 —— 布局零变化，杜绝闪烁 */
+.fc-h .h-ops { margin-left: auto; display: flex; gap: 2px; align-items: center; flex: none; opacity: 0; visibility: hidden; transition: opacity 120ms ease, visibility 120ms ease; }
+.fc-h:hover .h-ops { opacity: 1; visibility: visible; }
+.op { padding: 3px 8px; border-radius: var(--r-5); font-size: 11px; color: var(--tx-3); cursor: pointer; white-space: nowrap; }
+.op:hover { background: var(--bg-4); color: var(--tx-1); }
+.op.del:hover { color: var(--c-red); }
+.op.del.armed { background: var(--c-red); color: #fff; font-weight: 600; }
+.fc-b {
+  border-top: 1px solid var(--line-1); padding: 10px 12px 12px 18px;
+  display: flex; flex-direction: column; gap: 8px; position: relative;
+}
+.fc-b::before { content: ""; position: absolute; left: 19px; top: 0; bottom: 12px; width: 1px; background: var(--line-1); }
+.fr {
+  position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+  background: var(--bg-3); border: 1px solid var(--line-1); border-radius: var(--r-6);
+  transition: border-color var(--t-fast), background var(--t-fast); min-width: 0;
+}
+.fr:hover { border-color: var(--line-2); background: var(--bg-4); }
+.fr.dragging { opacity: .35; }
+.fr .fico { flex: none; font-size: 12px; color: var(--tx-3); }
+.fr .fr-main { flex: 1; min-width: 0; }
+.fr .fr-name { font-size: 12.5px; color: var(--tx-1); font-weight: 500; }
+.fr .fr-name.clickable { cursor: pointer; }
+.fr .fr-name.clickable:hover { color: var(--c-cyan); }
+.fr .fr-path { font-family: var(--f-mono); font-size: 10px; color: var(--tx-4); margin-top: 1px; }
+/* 文件名下方第二行内容（触发词 chips / 引用状态 pill）：左对齐 + 与文件名留间距 */
+.fr-main > .chip-row { margin-top: 4px; }
+.fr-main > .pill { margin-top: 4px; }
+.fr .sz { font-family: var(--f-mono); font-size: 10px; color: var(--tx-4); flex: none; }
+.fr .h-ops { display: flex; gap: 2px; flex: none; align-items: center; margin-left: auto; opacity: 0; visibility: hidden; transition: opacity 120ms ease, visibility 120ms ease; }
+.fr:hover .h-ops { opacity: 1; visibility: visible; }
+.fr-json { margin-top: 8px; border-top: 1px dashed var(--line-1); padding-top: 8px; max-height: 280px; overflow: auto; }
+.fr-json .json-ops { display: flex; gap: 6px; margin-bottom: 6px; }
+.fr-json pre { font-family: var(--f-mono); font-size: 11px; line-height: 1.6; color: var(--tx-2); white-space: pre; margin: 0; }
+.hidden-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 7px 12px;
+  background: var(--bg-2); border: 1px dashed var(--line-2); border-radius: var(--r-md);
+  font-size: 11px; color: var(--tx-3);
+}

@@ -66,6 +66,8 @@ export interface AppConfig {
   general: {
     language: string; minimize_to_tray: boolean; generate_thumbnails: boolean;
     hide_unmarked_assets: boolean; theme: string;
+    /** ComfyUI python.exe 路径（插件依赖安装用） */
+    comfyui_python?: string;
   };
   donate: DonateConfig;
 }
@@ -74,12 +76,19 @@ export interface AssetEntry {
   path: string; name: string; kind: string; size: number; modified: number; hidden: boolean;
 }
 export interface LoraEntry {
-  path: string; name: string; size: number; modified: number;
+  path: string; name: string; root: string; rel_dir: string;
+  size: number; modified: number;
   has_txt: boolean; trigger_words: string[];
 }
+export interface FileEntry {
+  path: string; name: string; root: string; rel_dir: string; size: number; modified: number;
+}
+export interface DirInfo { name: string; path: string; }
 export interface GitStatus {
   path: string; name: string; branch: string; status: string;
   behind: number; ahead: number; last_commit: string; last_commit_msg: string; has_remote: boolean;
+  /** 是否含 requirements.txt（可一键安装依赖） */
+  has_requirements?: boolean;
 }
 export interface VideoMeta {
   path: string; container: string; duration_secs: number; size: number; bitrate: number;
@@ -104,9 +113,20 @@ export const api = {
   // scan
   scanAssets: (dirs: string[]) => invoke<AssetEntry[]>("scan_assets", { dirs }),
   scanLoras: (dirs: string[]) => invoke<LoraEntry[]>("scan_loras", { dirs }),
-  scanPlugins: (dir: string) => invoke<{ path: string; name: string }[]>("scan_plugins", { dir }),
+  scanPlugins: (dir: string) => invoke<{ path: string; name: string; has_requirements: boolean }[]>("scan_plugins", { dir }),
+  scanFiles: (dirs: string[], exts: string[]) => invoke<FileEntry[]>("scan_files", { dirs, exts }),
+  listSubdirs: (path: string) => invoke<DirInfo[]>("list_subdirs", { path }),
+  // fsops（添加/建目录/移动）
+  copyFilesIn: (files: string[], destDir: string) => invoke<number>("copy_files_in", { files, destDir }),
+  createSubdir: (parent: string, name: string) => invoke<string>("create_subdir", { parent, name }),
+  moveDirInto: (srcDir: string, destParent: string) => invoke<string>("move_dir_into", { srcDir, destParent }),
+  moveFile: (src: string, destDir: string) => invoke<string>("move_file", { src, destDir }),
+  // 工作流 ↔ 模型联动
+  extractModelRefs: (paths: string[]) => invoke<string[]>("extract_model_refs", { paths }),
   pluginStatus: (path: string) => invoke<GitStatus>("plugin_status", { path }),
   pluginCheck: (path: string) => invoke<GitStatus>("plugin_check", { path }),
+  pluginClone: (url: string, destParent: string) => invoke<string>("plugin_clone", { url, destParent }),
+  pluginInstallDeps: (path: string, python: string) => invoke<string>("plugin_install_deps", { path, python }),
   pluginUpdate: (path: string) => invoke<GitStatus>("plugin_update", { path }),
   // hidden assets
   hiddenList: () => invoke<string[]>("hidden_list"),
@@ -119,7 +139,8 @@ export const api = {
   // asset delete (to recycle bin)
   deleteAsset: (path: string) => invoke<void>("delete_asset", { path }),
   deleteLora: (path: string) => invoke<void>("delete_lora", { path }),
-  deletePlugin: (path: string) => invoke<void>("delete_plugin", { path }),
+  deletePlugin: (path: string) => invoke<void>("delete_plugin", { dir: path }), // Rust 侧参数名为 dir
+  deleteAny: (path: string) => invoke<void>("delete_any", { path }),
   // lora
   readTriggerWords: (loraPath: string) =>
     invoke<string[]>("read_trigger_words", { loraPath }),
